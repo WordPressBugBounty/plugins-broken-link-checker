@@ -4,7 +4,7 @@ Contributors: managewp, wpmudev
 Tags: links, broken links, internal link, external link, broken images, seo, test links, check links, bad links
 Requires at least: 5.2
 Tested up to: 6.6
-Stable tag: 2.4.0
+Stable tag: 2.4.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -118,8 +118,11 @@ Oh, and one more thing… we hope you enjoy our free offerings as much as we’v
 
 == Changelog ==
 
+= 2.4.1 =
+* Security Fix: Cross-Site Scripting (XSS) vulnerability.
+
 = 2.4.0 =
-* Enhance: Improved editing and unlinking of URLs.
+* Enhance: Improved editing and unlinking of URLs with query parameters.
 * Fix: Resolved issue with implicit conversion from float to int in YouTube links.
 
 = 2.3.0 =
