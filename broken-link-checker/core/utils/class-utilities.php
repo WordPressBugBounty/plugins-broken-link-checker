@@ -155,7 +155,7 @@ final class Utilities {
 	 *
 	 * @return false|void
 	 */
-	public static function valid_subsite_id( int $id = null ) {
+	public static function valid_subsite_id( ?int $id = null ) {
 		if ( empty( $id ) || ! is_multisite() ) {
 			return false;
 		}
@@ -890,7 +890,7 @@ final class Utilities {
 	 *
 	 * @return string|null
 	 */
-	public static function timestamp_to_formatted_date( int $timestamp = null, bool $gmt_to_local = false ) {
+	public static function timestamp_to_formatted_date( ?int $timestamp = null, bool $gmt_to_local = false ) {
 		$timezone = null;
 
 		if ( ! $gmt_to_local ) {
@@ -963,7 +963,7 @@ final class Utilities {
 	 *
 	 * @return false|int
 	 */
-	public static function timestamp_from_UTC( int $timestamp = null ) {
+	public static function timestamp_from_UTC( ?int $timestamp = null ) {
 		$timestamp = is_null( $timestamp ) ? time() : $timestamp;
 		$timestamp = strlen( $timestamp ) === 13 ? $timestamp / 1000 : $timestamp;
 		$date_time = DateTime::createFromFormat( 'U', $timestamp, new DateTimeZone( 'UTC' ) );
@@ -1156,7 +1156,7 @@ final class Utilities {
 	 *
 	 * @return string
 	 */
-	public static function replace_mapped_values( string $content = '', array $map = array(), string $context = null, array $keys = array() ) {
+	public static function replace_mapped_values( string $content = '', array $map = array(), ?string $context = null, array $keys = array() ) {
 		if ( empty( $map ) ) {
 			return $content;
 		}
@@ -1180,7 +1180,7 @@ final class Utilities {
 	 * @param mixed  $input An array mapping keys and values/callbacks.
 	 * @param string $context An optional string holding a context. Used in filter to help in specificity.
 	 */
-	public static function get_mapped_value( $input = null, string $context = null ) {
+	public static function get_mapped_value( $input = null, ?string $context = null ) {
 		if ( is_null( $input ) ) {
 			return null;
 		}

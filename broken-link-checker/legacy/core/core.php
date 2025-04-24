@@ -29,6 +29,10 @@ if ( ! class_exists( 'blcLinkQuery' ) ) {
 	include_once BLC_DIRECTORY_LEGACY . '/includes/link-query.php';
 }
 
+if ( ! class_exists( 'blcIntegrations' ) ) {
+	include_once BLC_DIRECTORY_LEGACY . '/integrations/integrations.php';
+}
+
 if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 
 	/**
