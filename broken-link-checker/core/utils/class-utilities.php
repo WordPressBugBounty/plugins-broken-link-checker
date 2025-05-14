@@ -441,6 +441,14 @@ final class Utilities {
 	}
 
 	/**
+	 * 
+	 * Returns the hub's BLC page url.
+	 */
+	public static function hub_blc_page_url() {
+		return apply_filters( 'wpmudev_blc_hub_blc_page_url', self::hub_base_url() . 'site/' . self::site_id() . '/link-checker' );
+	}
+
+	/**
 	 * Returns the hub's pricing url.
 	 *
 	 * @return string
