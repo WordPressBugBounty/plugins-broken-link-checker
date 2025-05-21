@@ -3,7 +3,7 @@ Contributors: managewp, wpmudev
 Tags: links, broken links, internal link, external link, broken images
 Requires at least: 5.2
 Tested up to: 6.8
-Stable tag: 2.4.4
+Stable tag: 2.4.5
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -208,6 +208,9 @@ We take plugin security incredibly seriously; if you have a bug or vulnerability
 
 == Changelog ==
 
+= 2.4.5 =
+* Fix: Patched a vulnerability issue.
+
 = 2.4.4 =
 * Fix: Resolved issue where editing a link would get stuck in the Hub.
 * Fix: Updated the Hub link to correctly point to the BLC page within the Hub.
@@ -218,7 +221,7 @@ We take plugin security incredibly seriously; if you have a bug or vulnerability
 * Enhance: Add a new menu item to help you discover other free plugins by WPMU DEV and more
 
 = 2.4.2 =
-* Fix: Patched a vulnarability issue.
+* Fix: Patched a vulnerability issue.
 * Fix: Notice about _load_textdomain_just_in_time.
 
 = 2.4.1 =

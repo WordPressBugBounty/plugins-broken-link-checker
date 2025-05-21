@@ -255,9 +255,10 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
                         $.getJSON(
                             "<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>",
                             {
-                                'action': 'blc_dashboard_status',
-                                'random': Math.random()
-                            },
+							'action': 'blc_dashboard_status',
+							'random': Math.random(),
+							'nonce' : '<?php echo esc_js( wp_create_nonce( 'blc_full_status' ) ); ?>'
+							},
                             function (data) {
                                 if (data && (typeof (data.text) != 'undefined')) {
                                     $('#wsblc_activity_box').html(data.text);
@@ -3274,6 +3275,17 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		 * @return void
 		 */
 		function ajax_full_status() {
+			if ( ! current_user_can( 'edit_others_posts' ) || ! check_ajax_referer( 'blc_full_status', 'nonce', false ) ) {
+				wp_die(
+				json_encode(
+						array(
+							'error' => __( "You're not allowed to do that!", 'broken-link-checker' ),
+						)
+					),
+					403
+				);
+			}
+			
 			$status = $this->get_status();
 			$text   = $this->status_text( $status );
 
@@ -3372,6 +3384,17 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		 * @return void
 		 */
 		function ajax_current_load() {
+			if ( ! current_user_can( 'edit_others_posts' ) || ! check_ajax_referer( 'blc_current_load', 'nonce', false ) ) {
+				wp_die(
+				json_encode(
+						array(
+							'error' => __( "You're not allowed to do that!", 'broken-link-checker' ),
+						)
+					),
+					403
+				);
+			}
+
 			$load = blcUtility::get_server_load();
 			if ( empty( $load ) ) {
 				die( _x( 'Unknown', 'current load', 'broken-link-checker' ) );
@@ -3418,6 +3441,10 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 
 		function ajax_work() {
 			check_ajax_referer( 'blc_work' );
+
+			if ( ! current_user_can( 'edit_others_posts' ) ) {
+				die( __( "You're not allowed to do that!", 'broken-link-checker' ) );
+			}
 
 			//Run the worker function
 			$this->work();
