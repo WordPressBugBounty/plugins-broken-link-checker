@@ -3,7 +3,7 @@ Contributors: managewp, wpmudev
 Tags: links, broken links, internal link, external link, broken images
 Requires at least: 5.2
 Tested up to: 6.8
-Stable tag: 2.4.5
+Stable tag: 2.4.6
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -195,7 +195,7 @@ Yes, Broken Link Checker supports WordPress Multisite and gives you full flexibi
 Nope. The plugin doesn’t modify your content. It just finds the broken links and gives you options to manage them.
 
 = How can I report security issues or bugs? =
-We take plugin security incredibly seriously; if you have a bug or vulnerability to report, you can do so through the Patchstack Vulnerability Disclosure Program. It’s fast, easy, and you will be notified when the issue is fixed. [Report a vulnerability](https://patchstack.com/database/vdp/branda-white-labeling).
+We take plugin security incredibly seriously; if you have a bug or vulnerability to report, you can do so through the Patchstack Vulnerability Disclosure Program. It’s fast, easy, and you will be notified when the issue is fixed. [Report a vulnerability](https://patchstack.com/database/wordpress/plugin/broken-link-checker/vdp).
 
 == Screenshots ==
 
@@ -207,6 +207,9 @@ We take plugin security incredibly seriously; if you have a bug or vulnerability
 6. Local Broken Link Checker engine settings
 
 == Changelog ==
+
+= 2.4.6 =
+* Fix: Patched a vulnerability issue.
 
 = 2.4.5 =
 * Fix: Patched a vulnerability issue.

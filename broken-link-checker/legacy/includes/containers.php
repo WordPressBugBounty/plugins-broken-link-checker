@@ -561,7 +561,7 @@ class blcContainer {
 			return $new_value;
 		}
 
-		if ( is_array( $parser->modified_links ) ) {
+		if ( property_exists( $parser, 'modified_links' ) && is_array( $parser->modified_links ) ) {
 			$this->updating_urls = $parser->modified_links;
 		}
 

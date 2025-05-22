@@ -180,6 +180,17 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		 * @return void
 		 */
 		public function admin_footer() {
+			/*
+			Don't run the script if the user doesn't have the right capabilities to avoid abuse of overloading the server with requests.
+			Remove chances of unnecessary resource usage. Having every logged-in user spawn AJAX jobs is wasteful, especially on busy sites.
+			Malicious logged-in users could:
+			- Reduce the interval time eg from browser's (DoS risk).
+			- Open multiple tabs and flood server with AJAX calls (Logged-in attackers bypass most of rate-limiters and are harder to detect if they blend in).
+			*/
+			if ( ! current_user_can( 'edit_others_posts' ) ) {
+				return;
+			}
+
 			$fix = filter_input( INPUT_GET, 'fix-install-button', FILTER_VALIDATE_BOOLEAN );
 			$tab = ! empty( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : '';
 
