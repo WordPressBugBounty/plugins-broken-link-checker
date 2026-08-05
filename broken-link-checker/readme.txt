@@ -2,8 +2,8 @@
 Contributors: managewp, wpmudev
 Tags: links, broken links, internal link, external link, broken images
 Requires at least: 5.2
-Tested up to: 6.9
-Stable tag: 2.4.8
+Tested up to: 7.0
+Stable tag: 2.4.9
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -207,6 +207,25 @@ We take plugin security incredibly seriously; if you have a bug or vulnerability
 6. Local Broken Link Checker engine settings
 
 == Changelog ==
+
+= 2.4.9 =
+* Fix: Updated links in the footer of the Cloud admin page.
+* Fix: Fixed BLC Cloud link detection in comments.
+* Fix: Resolved BLC Local database error when checking pages.
+* Fix: Fixed BLC Cloud Elementor and SiteOrigin PageBuilder support.
+* Fix: Fixed BLC Cloud recipients counter in the role filter.
+* Fix: Improved BLC Cloud keyboard navigation for the recipients search field.
+* Fix: Fixed BLC Local result status code after request redirection.
+* Fix: Improved BLC Local accessibility.
+* Fix: Optimized BLC Local database.
+* Fix: Resolved PHP compatibility warnings.
+* Fix: Fixed BLC Cloud scheduled reports timezone support.
+* Enhance: Added blc_link_status_changed filter to monitor link status changes.
+* Enhance: Redirected users to the plugin dashboard after activation.
+* Enhance: Added BLC Local support for custom taxonomies.
+* Enhance: Added ability to sort BLC Local records by status code.
+* Enhance: BLC Cloud now automatically highlights broken links on the site.
+* Fix: Miscellaneousness improvements
 
 = 2.4.8 =
 * Fix: Patched a vulnerability issue.

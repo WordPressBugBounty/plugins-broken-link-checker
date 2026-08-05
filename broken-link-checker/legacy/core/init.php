@@ -42,7 +42,7 @@ if ( defined( 'BLC_ACTIVE' ) ) {
 	define( 'BLC_FOR_EDITING', 'edit' );
 	define( 'BLC_FOR_PARSING', 'parse' );
 	define( 'BLC_FOR_DISPLAY', 'display' );
-	define( 'BLC_DATABASE_VERSION', 16 );
+	define( 'BLC_DATABASE_VERSION', 17 );
 
 	/***********************************************
 					Configuration

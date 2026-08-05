@@ -33,6 +33,10 @@ class blcDatabaseUpgrader {
 				blcDatabaseUpgrader::upgrade_095();
 			}
 
+			if ( $current < 18 ) {
+				blcDatabaseUpgrader::upgrade_url_hash();
+			}
+
 			if ( $current == 16 ) {
 				blcDatabaseUpgrader::upgrade_3_2_3();
 			}
@@ -110,6 +114,20 @@ class blcDatabaseUpgrader {
 		$blclog->info( 'Done.' );
 
 		return true;
+	}
+
+	/**
+	 * Back-fill the url_hash column added in DB version 17.
+	 * The column itself is created by make_schema_current(); this only populates existing rows.
+	 *
+	 * @return void
+	 */
+	static function upgrade_url_hash() {
+		global $wpdb;
+
+		$wpdb->query( //phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			"UPDATE {$wpdb->prefix}blc_links SET url_hash = MD5(url) WHERE url_hash = ''"
+		);
 	}
 
 	static function upgrade_095( $trigger_errors = false ) {

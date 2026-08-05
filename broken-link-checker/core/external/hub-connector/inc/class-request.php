@@ -133,6 +133,25 @@ class Request {
 	}
 
 	/**
+	 * Make a POST request.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $path Endpoint route.
+	 * @param bool   $auth Should attach API key?.
+	 * @param array  $data Data array.
+	 *
+	 * @return mixed|WP_Error
+	 */
+	public function delete( $path, $auth = false, $data = array() ) {
+		try {
+			return $this->request( $path, $auth, $data, 'delete' );
+		} catch ( Exception $e ) {
+			return new WP_Error( $e->getCode(), $e->getMessage() );
+		}
+	}
+
+	/**
 	 * Make a GET request.
 	 *
 	 * @since 1.0.0
@@ -168,13 +187,11 @@ class Request {
 		$site_id = Data::get()->hub_site_id();
 
 		if ( ! empty( $key ) ) {
-			if ( 'post' === $method ) {
+			if ( in_array( strtolower( $method ), array( 'post', 'delete' ), true ) ) {
 				$this->add_post_argument( 'api_key', $key );
 			} else {
 				// Set API key if not already set.
-				if ( false === strpos( $url, '/' . $key ) ) {
-					$url .= '/' . $key;
-				}
+				$this->add_header_argument( 'Authorization', 'Basic ' . $key );
 				if ( ! empty( $site_id ) ) {
 					$this->add_get_argument( 'site_id', $site_id );
 				}
@@ -224,6 +241,16 @@ class Request {
 				$args['body'] = $data;
 
 				$response = wp_remote_post( $url, $args );
+				break;
+			case 'delete':
+				if ( is_array( $data ) ) {
+					$data = array_merge( $data, $this->post_args );
+				}
+
+				$args['body']   = $data;
+				$args['method'] = 'DELETE';
+
+				$response = wp_remote_request( $url, $args );
 				break;
 			case 'get':
 				// If data is set for get request add it to URL.

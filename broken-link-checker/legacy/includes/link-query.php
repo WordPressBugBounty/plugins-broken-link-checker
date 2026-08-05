@@ -466,6 +466,7 @@ class blcLinkQuery {
 				'url'          => 'links.url',
 				'link_text'    => 'instances.link_text',
 				'redirect_url' => 'links.final_url',
+				'status'       => 'links.http_code',
 			);
 			$column          = $params['orderby'];
 

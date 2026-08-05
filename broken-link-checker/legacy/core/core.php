@@ -83,16 +83,23 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		public $is_textdomain_loaded = false;
 
 		/**
+		 * Cached compiled regex for the exclusion list. Null means not yet built.
+		 *
+		 * @var string|null
+		 */
+		private $exclusion_regex = null;
+
+		/**
 		 * Class constructor
 		 *
 		 * @param string $loader The fully
 		 * qualified filename of the loader script that WP
 		 * identifies as the "main" plugin file.
-		 * @param blcConfigurationManager $conf An instance of the configuration manager.
+		 * @param blcConfigurationRegistry $conf An instance of the configuration manager.
 		 */
-		public function __construct( $loader, blcConfigurationManager $conf ) {
+		public function __construct( $loader, blcConfigurationRegistry $conf ) {
 			static $method_called = false;
-			
+
 			$this->db_version = BLC_DATABASE_VERSION;
 
 			$this->conf        = $conf;
@@ -196,7 +203,13 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 
 			if ( true === $fix && 'plugin-information' === $tab ) {
 				echo '<script>';
-				echo "jQuery('#plugin_install_from_iframe').on('click', function() { window.location.href = jQuery(this).attr('href'); return false;});";
+				echo "jQuery('#plugin_install_from_iframe').on('click keydown', function(e) { 
+					if (e.type === 'click' || (e.type === 'keydown' && (e.key === 'Enter' || e.key === ' '))) {
+						if (e.key === ' ') e.preventDefault();
+						window.location.href = jQuery(this).attr('href'); 
+						return false;
+					}
+				});";
 				echo '</script>';
 			}
 
@@ -240,16 +253,40 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		 * @return bool
 		 */
 		public function is_excluded( $url ) {
-			if ( ! is_array( $this->conf->options['exclusion_list'] ) ) {
+			if ( is_null( $this->exclusion_regex ) ) {
+				$this->build_exclusion_regex();
+			}
+			if ( empty( $this->exclusion_regex ) ) {
 				return false;
 			}
-			foreach ( $this->conf->options['exclusion_list'] as $excluded_word ) {
-				if ( stristr( $url, $excluded_word ) ) {
-					return true;
-				}
+			return (bool) preg_match( $this->exclusion_regex, $url );
+		}
+
+		/**
+		 * Build (or rebuild) the cached exclusion-list regex from the current options.
+		 * Call this whenever the exclusion list changes.
+		 */
+		public function build_exclusion_regex() {
+			if (
+				isset( $this->conf->options['exclusion_list'] ) &&
+				is_array( $this->conf->options['exclusion_list'] )
+			) {
+				$list = $this->conf->options['exclusion_list'];
+			} else {
+				$list = array();
 			}
 
-			return false;
+			// Exclude empty elements.
+			$list = array_filter( $list, 'strlen' );
+
+			if ( empty( $list ) ) {
+				$this->exclusion_regex = '';
+				return;
+			}
+
+			$patterns = array_map( fn( $w ) => preg_quote( $w, '/' ), $list );
+			// Join resulted patterns.
+			$this->exclusion_regex = '/' . implode( '|', $patterns ) . '/i';
 		}
 
 		/**
@@ -257,7 +294,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		 */
 		public function dashboard_widget() {
 			?>
-            <p id='wsblc_activity_box'><?php esc_html_e( 'Loading...', 'broken-link-checker' ); ?></p>
+            <p id='wsblc_activity_box' aria-live="polite" aria-atomic="true"><?php esc_html_e( 'Loading...', 'broken-link-checker' ); ?></p>
             <script type='text/javascript'>
                 jQuery(function ($) {
                     var blc_was_autoexpanded = false;
@@ -373,6 +410,33 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		}
 
 		/**
+		 * Retrieve module manager.
+		 *
+		 * @return \blcModuleManager
+		 */
+		protected function get_module_manager() {
+			return blcModuleManager::getInstance();
+		}
+
+		/**
+		 * Retrieve link query instance.
+		 *
+		 * @return \blcLinkQuery
+		 */
+		protected function get_link_query() {
+			return blcLinkQuery::getInstance();
+		}
+
+		/**
+		 * Retrieve configuration instance.
+		 *
+		 * @return \blcConfigurationRegistry
+		 */
+		protected function get_configuration() {
+			return $this->conf;
+		}
+
+		/**
 		 * A hook executed when the plugin is deactivated.
 		 *
 		 * @return void
@@ -386,11 +450,14 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 			wp_clear_scheduled_hook( 'blc_cron_check_news' ); // Unused event.
 			// Note the deactivation time for each module. This will help them
 			// synch up propely if/when the plugin is reactivated.
-			$moduleManager = blcModuleManager::getInstance();
+			$moduleManager = $this->get_module_manager();
 			$the_time      = current_time( 'timestamp' );
-			foreach ( $moduleManager->get_active_modules() as $module_id => $module ) {
-				$this->conf->options['module_deactivated_when'][ $module_id ] = $the_time;
+			
+			$module_deactivated_when = array();
+			foreach ( $moduleManager->get_active_modules_ids() as $module_id ) {
+				$module_deactivated_when[ $module_id ] = $the_time;
 			}
+			$this->conf->options['module_deactivated_when'] = $module_deactivated_when;
 			$this->conf->save_options();
 		}
 
@@ -426,7 +493,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 				// To make it easier to notice when broken links appear, display the current number of
 				// broken links in a little bubble notification in the "Broken Links" menu.
 				// (Similar to how the number of plugin updates and unmoderated comments is displayed).
-				$blc_link_query = blcLinkQuery::getInstance();
+				$blc_link_query = $this->get_link_query();
 				$broken_links   = $blc_link_query->get_filter_links( 'broken', array( 'count_only' => true ) );
 				if ( WPMUDEV_BLC\App\Options\Settings\Model::instance()->get( 'use_legacy_blc_version' ) && $broken_links > 0 ) {
 					// TODO: Appropriating existing CSS classes for my own purposes is hacky. Fix eventually.
@@ -537,7 +604,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		 * Function to show options page
 		 */
 		public function options_page() {
-			$moduleManager = blcModuleManager::getInstance();
+			$moduleManager = $this->get_module_manager();
 
 			if ( isset( $_POST['recheck'] ) && ! empty( $_POST['recheck'] ) ) {
 				$this->initiate_recheck();
@@ -642,6 +709,8 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 						PREG_SPLIT_NO_EMPTY //skip empty values
 					)
 				);
+				// Invalidate the cached exclusion regex so it is rebuilt on next check.
+				$this->exclusion_regex = null;
 
 				//Parse the custom field list
 				$new_custom_fields = array_filter(
@@ -863,13 +932,13 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 
 			//Show a confirmation message when settings are saved.
 			if ( ! empty( $_GET['settings-updated'] ) ) {
-				echo '<div id="message" class="updated fade"><p><strong>', __( 'Settings saved.', 'broken-link-checker' ), '</strong></p></div>';
+				echo '<div id="message" class="updated fade" role="status" aria-live="polite"><p><strong>', __( 'Settings saved.', 'broken-link-checker' ), '</strong></p></div>';
 
 			}
 
 			//Show one when recheck is started, too.
 			if ( ! empty( $_GET['recheck-initiated'] ) ) {
-				echo '<div id="message" class="updated fade"><p><strong>',
+				echo '<div id="message" class="updated fade" role="status" aria-live="polite"><p><strong>',
 				__( 'Complete site recheck started.', 'broken-link-checker' ), // -- Yoda
 				'</strong></p></div>';
 			}
@@ -912,12 +981,13 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
             </style>
             <![endif]-->
             <div class="wrap" id="blc-settings-wrap">
+                <a href="#blc-admin-content" class="screen-reader-text"><?php esc_html_e( 'Skip to main content', 'broken-link-checker' ); ?></a>
                <!-- <h2><?php //_e( 'Broken Link Checker Options', 'broken-link-checker' ); ?></h2>-->
 
 	            <?php WPMUDEV_BLC\App\Admin_Pages\Local_Submenu\View::instance()->local_header(); ?>
                 <?php WPMUDEV_BLC\App\Admin_Pages\Local_Submenu\View::instance()->local_nav(); ?>
 
-                <div id="blc-admin-content">
+                <div id="blc-admin-content" tabindex="-1">
 
                     <form name="link_checker_options" id="link_checker_options" method="post" action="
 				<?php
@@ -931,21 +1001,77 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 
                         <div id="blc-tabs">
 
-                            <ul class="hide-if-no-js">
+                            <ul class="hide-if-no-js" role="tablist" aria-label="<?php esc_attr_e( 'Settings sections', 'broken-link-checker' ); ?>">
 								<?php
+								$first_tab = true;
 								foreach ( $section_names as $section_id => $section_name ) {
 									printf(
-										'<li id="tab-button-%s"><a href="#section-%s" title="%s">%s</a></li>',
+										'<li id="tab-button-%s" role="tab" aria-controls="section-%s" aria-selected="%s" tabindex="%s" data-target="#section-%s" title="%s">%s</li>',
 										esc_attr( $section_id ),
+										esc_attr( $section_id ),
+										$first_tab ? 'true' : 'false',
+										$first_tab ? '0' : '-1',
 										esc_attr( $section_id ),
 										esc_attr( $section_name ),
 										$section_name
 									);
+									$first_tab = false;
 								}
 								?>
                             </ul>
+                            
+                            <script type="text/javascript">
+                            jQuery(document).ready(function($) {
+                                // Handle tab switching without nested interactive elements
+                                $('li[role="tab"]').on('click keydown', function(e) {
+                                    if (e.type === 'click' || (e.type === 'keydown' && (e.key === 'Enter' || e.key === ' '))) {
+                                        if (e.key === ' ') e.preventDefault();
+                                        
+                                        var $tab = $(this);
+                                        var targetId = $tab.data('target');
+                                        
+                                        // Update tab states
+                                        $('li[role="tab"]').attr('aria-selected', 'false').attr('tabindex', '-1');
+                                        $tab.attr('aria-selected', 'true').attr('tabindex', '0');
+                                        
+                                        // Update panel visibility
+                                        $('.blc-section').hide();
+                                        $(targetId).show();
+                                    }
+                                });
+                                
+                                // Keyboard navigation between tabs
+                                $('li[role="tab"]').on('keydown', function(e) {
+                                    var $tabs = $('li[role="tab"]');
+                                    var currentIndex = $tabs.index(this);
+                                    var $newTab;
+                                    
+                                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                                        e.preventDefault();
+                                        $newTab = $tabs.eq((currentIndex + 1) % $tabs.length);
+                                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                                        e.preventDefault();
+                                        $newTab = $tabs.eq((currentIndex - 1 + $tabs.length) % $tabs.length);
+                                    } else if (e.key === 'Home') {
+                                        e.preventDefault();
+                                        $newTab = $tabs.first();
+                                    } else if (e.key === 'End') {
+                                        e.preventDefault();
+                                        $newTab = $tabs.last();
+                                    }
+                                    
+                                    if ($newTab && $newTab.length) {
+                                        $newTab.focus();
+                                    }
+                                });
+                                
+                                // Initialize - show first tab content, hide others
+                                $('.blc-section').hide();
+                                $('#section-general').show();
+                            });
+                            </script>
 
-                            <div id="section-general" class="blc-section">
+                            <div id="section-general" class="blc-section" role="tabpanel" aria-labelledby="tab-button-general">
                                 <h3 class="hide-if-js"><?php echo $section_names['general']; ?></h3>
 
                                 <table class="form-table">
@@ -954,12 +1080,14 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
                                         <th scope="row">
 											<?php _e( 'Status', 'broken-link-checker' ); ?>
                                             <br>
-                                            <a href="javascript:void(0)"
-                                               id="blc-debug-info-toggle"><?php _e( 'Show debug info', 'broken-link-checker' ); ?></a>
+                                            <button type="button" class="button-link" 
+                                               id="blc-debug-info-toggle" 
+                                               aria-expanded="false"
+                                               aria-controls="blc-debug-info"><?php _e( 'Show debug info', 'broken-link-checker' ); ?></button>
                                         </th>
                                         <td>
 
-                                            <div id='wsblc_full_status'>
+                                            <div id='wsblc_full_status' aria-live="polite" aria-atomic="true">
                                                 <br/><br/><br/>
                                             </div>
 
@@ -990,13 +1118,14 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 											printf(
 												__( 'Every %s hours', 'broken-link-checker' ),
 												sprintf(
-													'<input type="text" name="check_threshold" id="check_threshold" value="%d" size="5" maxlength="5" />',
+													'<label for="check_threshold" class="screen-reader-text">%s</label><input type="text" name="check_threshold" id="check_threshold" value="%d" size="5" maxlength="5" aria-describedby="check_threshold_desc" />',
+													esc_attr__( 'Check frequency in hours', 'broken-link-checker' ),
 													$this->conf->options['check_threshold']
 												)
 											);
 											?>
                                             <br/>
-                                            <span class="description">
+                                            <span class="description" id="check_threshold_desc">
 				<?php _e( 'Existing links will be checked this often. New links will usually be checked ASAP.', 'broken-link-checker' ); ?>
 			</span>
 
@@ -1040,15 +1169,17 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
                                         <th scope="row"><?php echo __( 'Notification e-mail address', 'broken-link-checker' ); ?></th>
                                         <td>
                                             <p>
-                                                <label>
+                                                <label for="notification_email_address">
+													<?php esc_html_e( 'Email address for notifications', 'broken-link-checker' ); ?>
                                                     <input
-                                                            type="text"
+                                                            type="email"
                                                             name="notification_email_address"
                                                             id="notification_email_address"
                                                             value="<?php echo esc_attr( $this->conf->get( 'notification_email_address', '' ) ); ?>"
-                                                            class="regular-text ltr">
+                                                            class="regular-text ltr"
+                                                            aria-describedby="notification_email_desc">
                                                 </label><br>
-                                                <span class="description">
+                                                <span class="description" id="notification_email_desc">
 						<?php echo __( 'Leave empty to use the e-mail address specified in Settings &rarr; General.', 'broken-link-checker' ); ?>
 					</span>
                                             </p>
@@ -1096,11 +1227,13 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 													<?php _e( 'Apply custom formatting to broken links', 'broken-link-checker' ); ?>
                                                 </label>
                                                 |
-                                                <a id="toggle-broken-link-css-editor" href="#" class="blc-toggle-link">
+                                                <button type="button" id="toggle-broken-link-css-editor" class="button-link blc-toggle-link"
+                                                        aria-expanded="false"
+                                                        aria-controls="broken-link-css-wrap">
 													<?php
 													_e( 'Edit CSS', 'broken-link-checker' );
 													?>
-                                                </a>
+                                                </button>
                                             </p>
 
                                             <div id="broken-link-css-wrap"
@@ -1110,13 +1243,14 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 												}
 												?>
                                             >
-					<textarea name="broken_link_css" id="broken_link_css" cols='45' rows='4'><?php
+					<label for="broken_link_css" class="screen-reader-text"><?php esc_html_e( 'Custom CSS for broken links', 'broken-link-checker' ); ?></label>
+					<textarea name="broken_link_css" id="broken_link_css" cols='45' rows='4' aria-describedby="broken_link_css_desc"><?php
 					if ( isset( $this->conf->options['broken_link_css'] ) && current_user_can( 'unfiltered_html' ) ) {
 						echo $this->conf->options['broken_link_css'];
 					}
 					?>
 					</textarea>
-                                                <p class="description">
+                                                <p class="description" id="broken_link_css_desc">
 													<?php
 													printf(
 														__( 'Example : Lorem ipsum <a %s>broken link</a>, dolor sit amet.', 'broken-link-checker' ),
@@ -1140,11 +1274,13 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 													<?php _e( 'Apply custom formatting to removed links', 'broken-link-checker' ); ?>
                                                 </label>
                                                 |
-                                                <a id="toggle-removed-link-css-editor" href="#" class="blc-toggle-link">
+                                                <button type="button" id="toggle-removed-link-css-editor" class="button-link blc-toggle-link"
+                                                        aria-expanded="false"
+                                                        aria-controls="removed-link-css-wrap">
 													<?php
 													_e( 'Edit CSS', 'broken-link-checker' );
 													?>
-                                                </a>
+                                                </button>
                                             </p>
 
                                             <div id="removed-link-css-wrap"
@@ -1154,14 +1290,15 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 												}
 												?>
                                             >
-					<textarea name="removed_link_css" id="removed_link_css" cols='45' rows='4'><?php
+					<label for="removed_link_css" class="screen-reader-text"><?php esc_html_e( 'Custom CSS for removed links', 'broken-link-checker' ); ?></label>
+					<textarea name="removed_link_css" id="removed_link_css" cols='45' rows='4' aria-describedby="removed_link_css_desc"><?php
 					if ( isset( $this->conf->options['removed_link_css'] ) && current_user_can( 'unfiltered_html' ) ) {
 						echo $this->conf->options['removed_link_css'];
 					}
 					?>
 					</textarea>
 
-                                                <p class="description">
+                                                <p class="description" id="removed_link_css_desc">
 													<?php
 													printf(
 														__( 'Example : Lorem ipsum <span %s>removed link</span>, dolor sit amet.', 'broken-link-checker' ),
@@ -1231,15 +1368,17 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
                                         <th scope="row"><?php echo __( 'YouTube API Key', 'broken-link-checker' ); ?></th>
                                         <td>
                                             <p>
-                                                <label>
+                                                <label for="youtube_api_key">
+													<?php esc_html_e( 'YouTube API Key', 'broken-link-checker' ); ?>
                                                     <input
                                                             type="text"
                                                             name="youtube_api_key"
                                                             id="youtube_api_key"
                                                             value="<?php echo esc_html( $this->conf->options['youtube_api_key'] ); ?>"
-                                                            class="regular-text ltr">
+                                                            class="regular-text ltr"
+                                                            aria-describedby="youtube_api_key_desc">
                                                 </label><br>
-                                                <span class="description">
+                                                <span class="description" id="youtube_api_key_desc">
 							<?php printf( __( 'Use your own %1$sapi key%2$s for checking youtube links.', 'broken-link-checker' ), '<a href="https://developers.google.com/youtube/v3/getting-started">', '</a>' ); ?>
 						</span>
                                             </p>
@@ -1261,7 +1400,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 
                             </div>
 
-                            <div id="section-where" class="blc-section">
+                            <div id="section-where" class="blc-section" role="tabpanel" aria-labelledby="tab-button-where">
                                 <h3 class="hide-if-js"><?php echo $section_names['where']; ?></h3>
 
                                 <table class="form-table">
@@ -1312,7 +1451,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
                             </div>
 
 
-                            <div id="section-which" class="blc-section">
+                            <div id="section-which" class="blc-section" role="tabpanel" aria-labelledby="tab-button-which">
                                 <h3 class="hide-if-js"><?php echo $section_names['which']; ?></h3>
 
                                 <table class="form-table">
@@ -1332,21 +1471,26 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 
                                     <tr valign="top">
                                         <th scope="row"><?php _e( 'Exclusion list', 'broken-link-checker' ); ?></th>
-                                        <td><?php _e( "Don't check links where the URL contains any of these words (one per line) :", 'broken-link-checker' ); ?>
+                                        <td>
+                                            <label for="exclusion_list">
+												<?php _e( "Don't check links where the URL contains any of these words (one per line):", 'broken-link-checker' ); ?>
+                                            </label>
                                             <br/>
-                                            <textarea name="exclusion_list" id="exclusion_list" cols='45' rows='4'><?php
+                                            <textarea name="exclusion_list" id="exclusion_list" cols='45' rows='4' aria-describedby="exclusion_list_desc"><?php
 											if ( isset( $this->conf->options['exclusion_list'] ) ) {
 												echo esc_textarea( implode( "\n", $this->conf->options['exclusion_list'] ) );
 											}
 											?></textarea>
-
+                                            <p class="description" id="exclusion_list_desc">
+												<?php _e( 'Enter one URL fragment per line. Links containing any of these fragments will be excluded from checking.', 'broken-link-checker' ); ?>
+                                            </p>
                                         </td>
                                     </tr>
 
                                 </table>
                             </div>
 
-                            <div id="section-how" class="blc-section">
+                            <div id="section-how" class="blc-section" role="tabpanel" aria-labelledby="tab-button-how">
                                 <h3 class="hide-if-js"><?php echo $section_names['how']; ?></h3>
 
                                 <table class="form-table">
@@ -1366,7 +1510,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
                                 </table>
                             </div>
 
-                            <div id="section-advanced" class="blc-section">
+                            <div id="section-advanced" class="blc-section" role="tabpanel" aria-labelledby="tab-button-advanced">
                                 <h3 class="hide-if-js"><?php echo $section_names['advanced']; ?></h3>
 
                                 <table class="form-table">
@@ -1374,19 +1518,12 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
                                     <tr valign="top">
                                         <th scope="row"><?php _e( 'Timeout', 'broken-link-checker' ); ?></th>
                                         <td>
-
-											<?php
-
-											printf(
-												__( '%s seconds', 'broken-link-checker' ),
-												sprintf(
-													'<input type="text" name="timeout" id="blc_timeout" value="%d" size="5" maxlength="3" />',
-													$this->conf->options['timeout']
-												)
-											);
-
-											?>
-                                            <br/><span class="description">
+                                            <label for="blc_timeout" class="screen-reader-text">
+												<?php _e( 'Timeout in seconds:', 'broken-link-checker' ); ?>
+                                            </label>
+                                            <input type="number" name="timeout" id="blc_timeout" value="<?php echo esc_attr( $this->conf->options['timeout'] ); ?>" size="5" maxlength="3" min="1" max="999" aria-describedby="blc_timeout_desc" />
+                                            <?php _e( 'seconds', 'broken-link-checker' ); ?>
+                                            <br/><span class="description" id="blc_timeout_desc">
 			<?php _e( 'Links that take longer than this to load will be marked as broken.', 'broken-link-checker' ); ?>
 		</span>
 
@@ -1471,20 +1608,12 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
                                     <tr valign="top">
                                         <th scope="row"><?php _e( 'Max. execution time', 'broken-link-checker' ); ?></th>
                                         <td>
-
-											<?php
-
-											printf(
-												__( '%s seconds', 'broken-link-checker' ),
-												sprintf(
-													'<input type="text" name="max_execution_time" id="max_execution_time" value="%d" size="5" maxlength="5" />',
-													//$this->conf->options['max_execution_time']
-                                                $this->max_execution_time_option()
-												)
-											);
-
-											?>
-                                            <br/><span class="description">
+                                            <label for="max_execution_time" class="screen-reader-text">
+												<?php _e( 'Maximum execution time in seconds:', 'broken-link-checker' ); ?>
+                                            </label>
+                                            <input type="number" name="max_execution_time" id="max_execution_time" value="<?php echo esc_attr( $this->max_execution_time_option() ); ?>" size="5" maxlength="5" min="1" aria-describedby="max_execution_time_desc" />
+                                            <?php _e( 'seconds', 'broken-link-checker' ); ?>
+                                            <br/><span class="description" id="max_execution_time_desc">
 			<?php
 
 			_e( 'The plugin works by periodically launching a background job that parses your posts for links, checks the discovered URLs, and performs other time-consuming tasks. Here you can set for how long, at most, the link monitor may run each time before stopping.', 'broken-link-checker' );
@@ -1505,16 +1634,18 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 
 											if ( $available ) {
 												$value = ! empty( $this->conf->options['server_load_limit'] ) ? sprintf( '%.2f', $this->conf->options['server_load_limit'] ) : '';
-												printf(
-													'<input type="text" name="server_load_limit" id="server_load_limit" value="%s" size="5" maxlength="5"/> ',
-													$value
-												);
+												?>
+                                                <label for="server_load_limit" class="screen-reader-text">
+													<?php _e( 'Server load limit:', 'broken-link-checker' ); ?>
+                                                </label>
+                                                <input type="number" name="server_load_limit" id="server_load_limit" value="<?php echo esc_attr( $value ); ?>" size="5" maxlength="5" step="0.01" min="0" aria-describedby="server_load_limit_desc" />
+                                                <?php
 
 												printf(
 													__( 'Current load : %s', 'broken-link-checker' ),
 													'<span id="wsblc_current_load">...</span>'
 												);
-												echo '<br/><span class="description">';
+												echo '<br/><span class="description" id="server_load_limit_desc">';
 												printf(
 													__(
 														'Link checking will be suspended if the average <a href="%s">server load</a> rises above this number. Leave this field blank to disable load limiting.',
@@ -1525,7 +1656,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 												echo '</span>';
 
 											} else {
-												echo '<input type="text" disabled="disabled" value="', esc_attr( __( 'Not available', 'broken-link-checker' ) ), '" size="13"/><br>';
+												echo '<input type="text" disabled="disabled" value="', esc_attr( __( 'Not available', 'broken-link-checker' ) ), '" size="13" aria-hidden="true"/><br>';
 												echo '<span class="description">';
 												_e( 'Load limiting only works on Linux-like systems where <code>/proc/loadavg</code> is present and accessible.', 'broken-link-checker' );
 												echo '</span>';
@@ -1539,12 +1670,11 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
                                         <td>
 											<?php
 											$target_resource_usage = $this->conf->get( 'target_resource_usage', 0.25 );
-											printf(
-												'<input name="target_resource_usage" value="%d"
-						type="range" min="1" max="100" id="target_resource_usage">',
-												$target_resource_usage * 100
-											);
 											?>
+                                            <label for="target_resource_usage" class="screen-reader-text">
+												<?php _e( 'Target resource usage percentage:', 'broken-link-checker' ); ?>
+                                            </label>
+                                            <input name="target_resource_usage" value="<?php echo esc_attr( $target_resource_usage * 100 ); ?>" type="range" min="1" max="100" id="target_resource_usage" aria-describedby="target_resource_usage_desc target_resource_usage_percent" />
 
                                             <span id="target_resource_usage_percent">
 				<?php
@@ -1595,8 +1725,14 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 															<?php checked( $this->conf->options['custom_log_file_enabled'] ); ?>>
 														<?php echo _x( 'Custom', 'log file location', 'broken-link-checker' ); ?>
                                                     </label>
-                                                    <br><input type="text" name="log_file" id="log_file" size="90"
-                                                               value="<?php echo esc_attr( $this->conf->options['log_file'] ); ?>">
+                                                    <br>
+                                                    <label for="log_file" class="screen-reader-text">
+														<?php _e( 'Custom log file path', 'broken-link-checker' ); ?>
+                                                    </label>
+                                                    <input type="text" name="log_file" id="log_file" size="90" value="<?php echo esc_attr( $this->conf->options['log_file'] ); ?>" aria-describedby="log_file_desc" />
+                                                    <span class="description" id="log_file_desc">
+														<?php _e( 'Enter the full path to your custom log file location.', 'broken-link-checker' ); ?>
+                                                    </span>
                                                 </p>
 
                                             </div>
@@ -1608,7 +1744,10 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
                                             <div class="blc-logging-options">
                                                 <p>
 													<?php $schedules = wp_get_schedules(); ?>
-                                                    <select name="clear_log_on">
+                                                    <label for="clear_log_on" class="screen-reader-text">
+														<?php _e( 'Clear log file schedule:', 'broken-link-checker' ); ?>
+                                                    </label>
+                                                    <select name="clear_log_on" id="clear_log_on">
                                                         <option value=""> <?php esc_html_e( 'Never', 'wpmudev' ); ?></option>
 														<?php
 														foreach ( $schedules as $key => $schedule ) {
@@ -1678,7 +1817,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		 * @return void
 		 */
 		function print_module_list( $modules, $current_settings ) {
-			$moduleManager = blcModuleManager::getInstance();
+			$moduleManager = $this->get_module_manager();
 
 			foreach ( $modules as $module_id => $module_data ) {
 				$module_id = $module_data['ModuleID'];
@@ -1862,10 +2001,10 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 			global $wpdb;
 			/* @var wpdb $wpdb */
 
-			$blc_link_query = blcLinkQuery::getInstance();
+			$blc_link_query = $this->get_link_query();
 
 			//Cull invalid and missing modules so that we don't get dummy links/instances showing up.
-			$moduleManager = blcModuleManager::getInstance();
+			$moduleManager = $this->get_module_manager();
 			$moduleManager->validate_active_modules();
 
 			if ( defined( 'BLC_DEBUG' ) && constant( 'BLC_DEBUG' ) ) {
@@ -2045,12 +2184,12 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 			} else {
 				//Save the new filter
 				$name           = strip_tags( strval( $_POST['name'] ) );
-				$blc_link_query = blcLinkQuery::getInstance();
+				$blc_link_query = $this->get_link_query();
 				
 				$params = array();
 				wp_parse_str( $_POST['params'], $params );
 				
-				$allowed_keys   = blcLinkQuery::getInstance()->valid_url_params;
+				$allowed_keys   = $this->get_link_query()->valid_url_params;
 				$forbidden_keys = array_diff( array_keys( $params ), $allowed_keys );
 
 				if ( count( $forbidden_keys ) > 0 ) {
@@ -2094,7 +2233,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 				$msg_class = 'error';
 			} else {
 				//Try to delete the filter
-				$blc_link_query = blcLinkQuery::getInstance();
+				$blc_link_query = $this->get_link_query();
 				if ( $blc_link_query->delete_custom_filter( $_POST['filter_id'] ) ) {
 					//Success
 					$message = __( 'Filter deleted', 'broken-link-checker' );
@@ -2700,7 +2839,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		 * @return void
 		 */
 		function links_page_css() {
-			wp_enqueue_style( 'blc-links-page', plugins_url( 'css/links-page.css', $this->loader ), array(), '20141113-2' );
+			wp_enqueue_style( 'blc-links-page', plugins_url( 'css/links-page.css', $this->loader ), array(), '20260803-2' );
 
 			if ( WPMUDEV_BLC\Core\Utils\Utilities::is_subsite() ) {
                 $local_style = WPMUDEV_BLC\App\Admin_Pages\Local_Submenu\Controller::instance()->get_local_style_data();
@@ -2969,7 +3108,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 			}
 
 			//Load modules for this context
-			$moduleManager = blcModuleManager::getInstance();
+			$moduleManager = $this->get_module_manager();
 			$moduleManager->load_modules( 'work' );
 
 			$target_usage_fraction = $this->conf->get( 'target_resource_usage', 0.25 );
@@ -3224,20 +3363,15 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 
 			//Only check links that have at least one valid instance (i.e. an instance exists and
 			//it corresponds to one of the currently loaded container/parser types).
-			$manager           = blcModuleManager::getInstance();
-			$loaded_containers = $manager->get_escaped_ids( 'container' );
-			$loaded_parsers    = $manager->get_escaped_ids( 'parser' );
+			$loaded_containers = $this->get_containers();
+			$loaded_parsers    = $this->get_parsers();
 
-			//Note : This is a slow query, but AFAIK there is no way to speed it up.
-			//I could put an index on last_check_attempt, but that value is almost
-			//certainly unique for each row so it wouldn't be much better than a full table scan.
 			if ( $count_only ) {
-				$q = "SELECT COUNT(DISTINCT links.link_id)\n";
+				$q = "SELECT COUNT(*)\n";
 			} else {
-				$q = "SELECT DISTINCT links.*\n";
+				$q = "SELECT links.*\n";
 			}
 			$q .= "FROM {$wpdb->prefix}blc_links AS links
-				INNER JOIN {$wpdb->prefix}blc_instances AS instances USING(link_id)
 				WHERE
 					(
 						( last_check_attempt < %s )
@@ -3249,11 +3383,13 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 							AND last_check_attempt < %s
 						)
 					)
-
-				AND
-					( instances.container_type IN ({$loaded_containers}) )
-					AND ( instances.parser_type IN ({$loaded_parsers}) )
-				";
+				AND EXISTS (
+					SELECT 1
+					FROM {$wpdb->prefix}blc_instances AS instances
+					WHERE instances.link_id = links.link_id
+					  AND instances.container_type IN ({$loaded_containers})
+					  AND instances.parser_type IN ({$loaded_parsers})
+				)";
 
 			if ( ! $count_only ) {
 				$q .= "\nORDER BY last_check_attempt ASC\n";
@@ -3290,6 +3426,28 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 			}
 
 			return $links;
+		}
+
+		/**
+		 * Get the IDs of the currently loaded container modules,
+		 * properly escaped for use in SQL queries.
+		 *
+		 * @return string
+		 */
+		protected function get_containers() {
+			return $this->get_module_manager()
+				->get_escaped_ids( 'container' );
+		}
+
+		/**
+		 * Get the IDs of the currently loaded parser modules,
+		 * properly escaped for use in SQL queries.
+		 *
+		 * @return string
+		 */
+		protected function get_parsers() {
+			return $this->get_module_manager()
+				->get_escaped_ids( 'parser' );
 		}
 
 		/**
@@ -3441,7 +3599,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		 * @return array
 		 */
 		function get_status() {
-			$blc_link_query = blcLinkQuery::getInstance();
+			$blc_link_query = $this->get_link_query();
 
 			$check_threshold   = date( 'Y-m-d H:i:s', strtotime( '-' . $this->conf->options['check_threshold'] . ' hours' ) );//phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
 			$recheck_threshold = date( 'Y-m-d H:i:s', time() - $this->conf->options['recheck_threshold'] );//phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date

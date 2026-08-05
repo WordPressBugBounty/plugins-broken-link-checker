@@ -144,6 +144,15 @@ class Controller extends Rest_Api {
 
 				Settings::instance()->save();
 				break;
+			case 'hc-disconnect-notice-shown' :
+				Settings::instance()->set(
+					array(
+						'show_disconnect_notice' => false,
+					)
+				);
+
+				Settings::instance()->save();
+				break;
 			case 'save-version-highlights-option' :
 				Settings::instance()->set(
 					array(

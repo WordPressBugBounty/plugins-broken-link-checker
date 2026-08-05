@@ -191,90 +191,212 @@ class Controller extends Base {
 	/**
 	 * Returns the timestamp of next scheduled scan.
 	 *
-	 * @param array $schedule
+	 * @param array $schedule     The schedule data. Falls back to stored settings if frequency is absent.
+	 * @param int   $current_time Optional. Local timestamp to use as the current time. Defaults to current time in site's timezone.
 	 *
-	 * @return false|int|null
+	 * @return int|null
 	 */
-	public function get_timestamp( array $schedule = array() ) {
-		$schedule  = ! empty( $schedule['frequency'] ) ? $schedule : $this->get_schedule();
-		$timestamp = null;
+	public function get_timestamp( array $schedule = array(), int $current_time = 0 ): ?int {
+		if ( ! $current_time ) {
+			// If current time is not provided, we will use the current timestamp in the site's timezone.
+			$zone       = wp_timezone();
+			$local_time = date_create( 'now' );
 
-		if ( empty( $schedule['frequency'] ) || empty( $schedule['time'] ) ) {
-			return $timestamp;
+			$local_time->setTimezone( $zone );
+			$current_time = $local_time->getTimestamp();
 		}
 
-		$schedule_time = $schedule['time'];
-		// phpcs:ignore
-		$current_day_num = 'monthly' === $schedule['frequency'] ? date( 'd' ) : date( 'w', time() );
-		$schedule_days   = 'monthly' === $schedule['frequency'] ? $schedule['monthdays'] : $schedule['days'];
+		if ( empty( $schedule['frequency'] ) ) {
+			// If frequency is not set, we will try to get the schedule from settings.
+			$schedule = $this->get_schedule();
+		}
 
-		if ( 'daily' !== $schedule['frequency'] && empty( $schedule_days ) ) {
-			return $timestamp;
+		if ( empty( $schedule['frequency'] ) || empty( $schedule['time'] ) ) {
+			return null;
+		}
+
+		$frequency     = $schedule['frequency'];
+		$schedule_time = $schedule['time'];
+
+		if ( 'daily' === $frequency ) {
+			// Return the timestamp for the next daily scan.
+			return self::build_daily_schedule_timestamp( $schedule_time, $current_time );
+		}
+
+		if ( 'monthly' === $frequency ) {
+			// For monthly frequency, we need to get the current day of the month and the scheduled month days.
+			$current_day_num = gmdate( 'd', $current_time );
+			$schedule_days   = $schedule['monthdays'] ?? array();
+		} else {
+			// For weekly frequency, we need to get the current day of the week and the scheduled weekdays.
+			$current_day_num = gmdate( 'w', $current_time );
+			$schedule_days   = $schedule['days'] ?? array();
+		}
+
+		if ( empty( $schedule_days ) ) {
+			return null;
 		}
 
 		sort( $schedule_days );
 
-		switch ( $schedule['frequency'] ) {
-			case 'daily':
-				if ( date_format( date_create( date_i18n( 'H:i' ) ), 'Hi' ) > date_format( date_create( $schedule_time ), 'Hi' ) ) {
-					$timestamp = strtotime( "tomorrow {$schedule_time} " . wp_timezone_string() );
-				} else {
-					$timestamp = strtotime( "today {$schedule_time} " . wp_timezone_string() );
-				}
-				break;
+		if ( 'weekly' === $frequency ) {
+			// Return the timestamp for the next weekly scan.
+			return self::build_weekly_schedule_timestamp(
+				$schedule_time,
+				$schedule_days,
+				$current_day_num,
+				$current_time
+			);
+		}
 
-			case 'weekly':
-			case 'monthly':
-				$next_day_num        = null;
-				$move_to_next_period = false;
+		if ( 'monthly' === $frequency ) {
+			// Return the timestamp for the next monthly scan.
+			return self::build_monthly_schedule_timestamp(
+				$schedule_time,
+				$schedule_days,
+				$current_day_num,
+				$current_time
+			);
+		}
 
-				if ( in_array( $current_day_num, $schedule_days, true ) ) {
-					$day_key = array_keys( $schedule_days, $current_day_num, true )[0];
+		return null;
+	}
 
-					if ( date_format( date_create( date_i18n( 'H:i' ) ), 'Hi' ) >= date_format( date_create( $schedule_time ), 'Hi' ) ) {
-						$next_day_num = array_key_exists( ( $day_key + 1 ), $schedule_days ) ? $schedule_days[ ( $day_key + 1 ) ] : null;
-					} else {
-						$timestamp = strtotime( "today {$schedule_time}" . ' ' . wp_timezone_string() );
-					}
-				}
+	/**
+	 * Returns the timestamp for the next daily scan.
+	 *
+	 * @param string $time The time of the day in HH:MM format.
+	 * @param int    $current_time The current timestamp.
+	 *
+	 * @return int
+	 */
+	private static function build_daily_schedule_timestamp( string $time, int $current_time ): int {
+		// Create a DateTime object for the scheduled time today in the site's timezone.
+		// Date example: "3:00 pm" or "4:00 am".
+		$schedule_time = date_create_from_format(
+			'g:i a',
+			$time,
+			wp_timezone()
+		);
 
-				if ( is_null( $next_day_num ) ) {
-					foreach ( $schedule_days as $day_num ) {
-						if ( intval( $day_num ) > intval( $current_day_num ) ) {
-							$next_day_num = intval( $day_num );
-							break;
-						}
-					}
-				}
-
-				if ( is_null( $next_day_num ) ) {
-					$next_day_num        = intval( $schedule_days[0] );
-					$move_to_next_period = true;
-				}
-
-				if ( is_null( $timestamp ) ) {
-					if ( 'weekly' === $schedule['frequency'] ) {
-						// phpcs:ignore
-						$day_name  = date( 'l', strtotime( "Sunday +{$next_day_num} days" ) );
-						$timestamp = strtotime( "next {$day_name} {$schedule_time}" . ' ' . wp_timezone_string() );
-					} else {
-						if ( $move_to_next_period ) {
-							// As we're adding $next_day_num as additional days in next month, we need to deduct it by one.
-							-- $next_day_num;
-							$timestamp = strtotime( "+{$next_day_num} days {$schedule_time}" . ' ' . wp_timezone_string(), strtotime( 'first day of next month' ) );
-						} else {
-							$days_diff = $next_day_num - $current_day_num;
-							$timestamp = strtotime( "+{$days_diff} days {$schedule_time}" . ' ' . wp_timezone_string() );
-						}
-					}
-				}
-
-				break;
-
-			default:
-				$timestamp = null;
+		if ( $current_time > $schedule_time->getTimestamp() ) {
+			// Current time is later than the scheduled time, so schedule for tomorrow.
+			$timestamp = Utilities::str_to_time( "tomorrow {$time}" );
+		} else {
+			// Current time is earlier than or equal to the scheduled time, so schedule for today.
+			$timestamp = Utilities::str_to_time( "today {$time}" );
 		}
 
 		return $timestamp;
+	}
+
+	/**
+	 * Finds which day number to schedule next, and whether the period must roll over.
+	 * Shared by weekly and monthly calculations.
+	 *
+	 * @param array  $days            Sorted list of scheduled day numbers.
+	 * @param mixed  $current_day_num The current day number (0-6 for weekly, 1-31 for monthly).
+	 * @param string $time            Scheduled time string in "HH:MM" format.
+	 * @param int    $current_time    Current Unix timestamp.
+	 *
+	 * @return array{schedule_today: bool, next_day_num: int|null, move_to_next_period: bool}
+	 */
+	private static function find_next_scheduled_day( array $days, $current_day_num, string $time, int $current_time ): array {
+		$schedule_today = false;
+		$next_day_num   = null;
+
+		if ( in_array( $current_day_num, $days, true ) ) {
+
+			// If today is a scheduled day, check if the scheduled time has already passed.
+			$day_key = array_keys( $days, $current_day_num, true )[0];
+
+			if ( date_i18n( 'H:i', $current_time ) < $time ) {
+				$schedule_today = true;
+			} elseif ( array_key_exists( $day_key + 1, $days ) ) {
+
+				// If there is a next scheduled day in the list, set it as the next day.
+				$next_day_num = $days[ $day_key + 1 ];
+			}
+		}
+
+		if ( ! $schedule_today && is_null( $next_day_num ) ) {
+
+			// If today is not a scheduled day, find the next scheduled day in the list.
+			foreach ( $days as $day_num ) {
+				if ( intval( $day_num ) > intval( $current_day_num ) ) {
+
+					// If the scheduled day is later in the week/month, set it as the next day.
+					$next_day_num = intval( $day_num );
+					break;
+				}
+			}
+		}
+
+		$move_to_next_period = false;
+		if ( ! $schedule_today && is_null( $next_day_num ) ) {
+			// If there is no next scheduled day in the list,
+			// roll over to the first scheduled day in the next period.
+			$next_day_num        = intval( $days[0] );
+			$move_to_next_period = true;
+		}
+
+		return array(
+			'schedule_today'      => $schedule_today,
+			'next_day_num'        => $next_day_num,
+			'move_to_next_period' => $move_to_next_period,
+		);
+	}
+
+	/**
+	 * Builds the timestamp for the next weekly scheduled scan.
+	 *
+	 * @param string $time            Scheduled time string in "HH:MM" format.
+	 * @param array  $days            Sorted list of scheduled weekday numbers (0 = Sunday, 6 = Saturday).
+	 * @param mixed  $current_day_num Current weekday number from date('w').
+	 * @param int    $current_time    Current Unix timestamp.
+	 *
+	 * @return int
+	 */
+	private static function build_weekly_schedule_timestamp( string $time, array $days, $current_day_num, int $current_time ): int {
+		// Find the next scheduled day and whether to schedule for today or the next week.
+		$result = self::find_next_scheduled_day( $days, $current_day_num, $time, $current_time );
+
+		if ( $result['schedule_today'] ) {
+			return Utilities::str_to_time( "today {$time}" );
+		}
+
+		$next_day_num = $result['next_day_num'];
+		// Get name of the next scheduled day (e.g., "Monday", "Tuesday") based on its number.
+		$day_name     = gmdate( 'l', Utilities::str_to_time( "Sunday +{$next_day_num} days" ) );
+		return Utilities::str_to_time( "next {$day_name} {$time}" );
+	}
+
+	/**
+	 * Builds the timestamp for the next monthly scheduled scan.
+	 *
+	 * @param string $time            Scheduled time string in "HH:MM" format.
+	 * @param array  $days            Sorted list of scheduled month-day numbers (1–31).
+	 * @param mixed  $current_day_num Current month day from date('d').
+	 * @param int    $current_time    Current Unix timestamp.
+	 *
+	 * @return int
+	 */
+	private static function build_monthly_schedule_timestamp( string $time, array $days, $current_day_num, int $current_time ): int {
+		$result = self::find_next_scheduled_day( $days, $current_day_num, $time, $current_time );
+
+		if ( $result['schedule_today'] ) {
+			return Utilities::str_to_time( "today {$time}" );
+		}
+
+		$next_day_num = $result['next_day_num'];
+
+		if ( $result['move_to_next_period'] ) {
+			// Subtracting one because we're offsetting from "first day of next month".
+			--$next_day_num;
+			return Utilities::str_to_time( "first day of next month +{$next_day_num} days {$time}" );
+		}
+
+		$days_diff = intval( $next_day_num ) - intval( $current_day_num );
+		return Utilities::str_to_time( "+{$days_diff} days {$time}" );
 	}
 }

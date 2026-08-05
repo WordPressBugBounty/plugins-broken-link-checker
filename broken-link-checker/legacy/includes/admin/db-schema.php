@@ -74,6 +74,7 @@ if ( ! function_exists( 'blc_get_db_schema' ) ) {
 	CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}blc_links` (
 		`link_id` int(20) unsigned NOT NULL AUTO_INCREMENT,
 		`url` text CHARACTER SET utf8 COLLATE utf8_bin NOT NULL,
+		`url_hash` CHAR(32) NOT NULL DEFAULT '',
 		`first_failure` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
 		`last_check` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
 		`last_success` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
@@ -103,7 +104,8 @@ if ( ! function_exists( 'blc_get_db_schema' ) ) {
 		KEY `broken` (`broken`),
 		KEY `last_check_attempt` (`last_check_attempt`),
 		KEY `may_recheck` (`may_recheck`),
-		KEY `check_count` (`check_count`)
+		KEY `check_count` (`check_count`),
+		UNIQUE KEY `url_hash` (`url_hash`)
 
 	) {$charset_collate};
 

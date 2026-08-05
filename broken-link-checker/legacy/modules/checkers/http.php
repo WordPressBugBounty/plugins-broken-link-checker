@@ -204,11 +204,14 @@ class blcCurlHttp extends blcHttpCheckerBase {
 		// Add a semi-plausible referer header to avoid tripping up some bot traps
 		curl_setopt( $ch, CURLOPT_REFERER, home_url() );
 
-		// Redirects don't work when safe mode or open_basedir is enabled.
-		if ( ! blcUtility::is_safe_mode() && ! blcUtility::is_open_basedir() ) {
+		/*
+		 * Redirects don't work when open_basedir is enabled.
+		 * https://www.php.net/manual/en/curl.constants.php#constant.curlopt-followlocation
+		 */
+		if ( ! blcUtility::is_open_basedir() ) {
 			curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, true );
 		} else {
-			$log .= "[Warning] Could't follow the redirect URL (if any) because safemode or open base dir enabled\n";
+			$log .= "[Warning] Could't follow the redirect URL (if any) because open base dir enabled\n";
 		}
 
 		// Set maximum redirects
@@ -295,8 +298,23 @@ class blcCurlHttp extends blcHttpCheckerBase {
 			$result['request_duration'] = $measured_request_duration;
 		}
 
+		// Preserve the final destination's HTTP code for broken-link detection.
+		// $result['http_code'] may be overridden below with the redirect code for display.
+		$final_http_code = $result['http_code'];
+
+		// If at least one redirect occurred, extract the first redirect status code
+		// from the accumulated response headers so the Status column displays 301/302.
+		if ( $result['redirect_count'] > 0 ) {
+			if ( preg_match( '/^HTTP\/\S+\s+(\d+)/m', $this->last_headers, $matches ) ) {
+				$redirect_code = intval( $matches[1] );
+				if ( $redirect_code >= 300 && $redirect_code < 400 ) {
+					$result['http_code'] = $redirect_code;
+				}
+			}
+		}
+
 		// Determine if the link counts as "broken"
-		if ( 0 === absint( $result['http_code'] ) ) {
+		if ( 0 === absint( $final_http_code ) ) {
 			$result['broken'] = true;
 
 			$error_code = curl_errno( $ch );
@@ -333,12 +351,12 @@ class blcCurlHttp extends blcHttpCheckerBase {
 					$result['status_code'] = BLC_LINK_STATUS_WARNING;
 					$result['status_text'] = __( 'Unknown Error', 'broken-link-checker' );
 			}
-		} elseif ( 999 === $result['http_code'] ) {
+		} elseif ( 999 === $final_http_code ) {
 			$result['status_code'] = BLC_LINK_STATUS_WARNING;
 			$result['status_text'] = __( 'Unknown Error', 'broken-link-checker' );
 			$result['warning']     = true;
 		} else {
-			$result['broken'] = $this->is_error_code( $result['http_code'] );
+			$result['broken'] = $this->is_error_code( $final_http_code );
 		}
 
 		// Apply filter before curl closes
@@ -444,14 +462,20 @@ class blcWPHttp extends blcHttpCheckerBase {
 
 		$start_time = microtime_float();
 
-		// Fetch the URL with Snoopy
-		$snoopy       = new WP_Http();
+		// Fetch the URL with WP_Http. Try HEAD first to avoid downloading the body.
 		$request_args = array(
 			'timeout'    => $timeout,
 			'user-agent' => 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)', // masquerade as IE 7
 			'aa'         => 1024 * 5,
 		);
-		$request      = wp_safe_remote_get( $this->urlencodefix( $url ), $request_args );
+
+		$request   = wp_safe_remote_head( $this->urlencodefix( $url ), $request_args );
+		$http_code = is_wp_error( $request ) ? 0 : (int) wp_remote_retrieve_response_code( $request );
+
+		// Fall back to GET if the server rejected HEAD (405 Method Not Allowed) or returned nothing.
+		if ( in_array( $http_code, array( 0, 405 ), true ) ) {
+			$request = wp_safe_remote_get( $this->urlencodefix( $url ), $request_args );
+		}
 
 		// request timeout results in WP ERROR
 		if ( is_wp_error( $request ) ) {
@@ -459,7 +483,6 @@ class blcWPHttp extends blcHttpCheckerBase {
 			$result['timeout']   = true;
 			$result['message']   = $request->get_error_message();
 		} else {
-			$http_resp           = wp_remote_retrieve_body( $request );
 			$result['http_code'] = wp_remote_retrieve_response_code( $request ); // HTTP status code
 			$result['message']   = wp_remote_retrieve_response_message( $request );
 		}

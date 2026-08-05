@@ -272,6 +272,7 @@ class Controller extends Admin_Page {
 				'dash_active'            => boolval( Utilities::dash_plugin_active() ),
 				'site_connected'         => boolval( $this->site_connected ),
 				'show_connector_notice'  => ! empty( \WPMUDEV_BLC\App\Options\Settings\Model::instance()->get( 'show_connector_notice' ) ),
+				'show_disconnect_notice' => ! empty( \WPMUDEV_BLC\App\Options\Settings\Model::instance()->get( 'show_disconnect_notice' ) ),
 				'use_connector'          => boolval( $this->use_connector ),
 				'connector_page_url'     => $this->get_hub_connector_url(),
 				'expired_membership'     => boolval( Utilities::membership_expired() ),
@@ -306,6 +307,7 @@ class Controller extends Admin_Page {
 				'profileData'            => self::get_profile_data(),
 				'hubConnectorConnected'  => boolval( self::hub_connector_connected() ),
 				'offlineAvatar'          => esc_url_raw( WPMUDEV_BLC_URL . '/assets/images/offline-avatar.png' ),
+				'cloudScanPageUrl'       => esc_url_raw( $this->admin_page_url( array( 'page' => 'blc_dash' ) ) ),
 			), // End blc_dashboard/data.
 			'labels' => array(
 				'page_title'     => esc_html( $this->page_title ),
@@ -457,14 +459,14 @@ class Controller extends Admin_Page {
 
 		// In front end we are looking for `avatar` index.
 		if ( isset( $data->data['avatar_urls'] ) && is_array( $data->data['avatar_urls'] ) ) {
-			if ( isset( $data->data['avatar_urls'][30] ) ) {
-				$data->data['avatar'] = $data->data['avatar_urls'][30];
+			$avatars = $data->data['avatar_urls'];
+			if ( isset( $avatars[30] ) ) {
+				$data->data['avatar_urls'] = array( $avatars[30] );
 			} else {
-				$data->data['avatar'] = array_values( $data->data['avatar_urls'] )[0];
+				$data->data['avatar_urls'] = array( array_values( $avatars )[0] );
 			}
 		}
 
-		unset( $data->data['avatar_urls'] );
 		unset( $data->data['url'] );
 		unset( $data->data['description'] );
 		unset( $data->data['link'] );
