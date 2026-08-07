@@ -265,29 +265,33 @@ class Controller extends Base {
 	/**
 	 * Returns the timestamp for the next daily scan.
 	 *
-	 * @param string $time The time of the day in HH:MM format.
+	 * Uses Utilities::str_to_time() (DateTimeImmutable-based) rather than
+	 * date_create_from_format().
+	 *
+	 * The schedule time accepts whichever format the site's Time Format setting
+	 * has (e.g. "3:00 pm" or "15:30"), and that setting can change at any
+	 * point after the schedule was saved.
+	 *
+	 * A fixed-format parser can silently mismatch and fail
+	 * Function Utilities::str_to_time() parses either form without needing to
+	 * know which one was used, matching how the weekly/monthly builders below
+	 * already build their timestamps.
+	 *
+	 * @param string $time The time of the day, e.g. "3:00 pm" or "15:30".
 	 * @param int    $current_time The current timestamp.
 	 *
 	 * @return int
 	 */
 	private static function build_daily_schedule_timestamp( string $time, int $current_time ): int {
-		// Create a DateTime object for the scheduled time today in the site's timezone.
-		// Date example: "3:00 pm" or "4:00 am".
-		$schedule_time = date_create_from_format(
-			'g:i a',
-			$time,
-			wp_timezone()
-		);
+		$today_timestamp = Utilities::str_to_time( "today {$time}" );
 
-		if ( $current_time > $schedule_time->getTimestamp() ) {
+		if ( $current_time > $today_timestamp ) {
 			// Current time is later than the scheduled time, so schedule for tomorrow.
-			$timestamp = Utilities::str_to_time( "tomorrow {$time}" );
-		} else {
-			// Current time is earlier than or equal to the scheduled time, so schedule for today.
-			$timestamp = Utilities::str_to_time( "today {$time}" );
+			return Utilities::str_to_time( "tomorrow {$time}" );
 		}
 
-		return $timestamp;
+		// Current time is earlier than or equal to the scheduled time, so schedule for today.
+		return $today_timestamp;
 	}
 
 	/**
