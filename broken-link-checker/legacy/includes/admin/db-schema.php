@@ -44,6 +44,12 @@ if ( ! function_exists( 'blc_get_db_schema' ) ) {
 
 		$charset_collate = wpmudev_blc_local_get_charset_collate();
 
+		// Note: blc_links.url_hash intentionally has no UNIQUE KEY here. Adding the
+		// column and its unique constraint in the same pass (as this declarative
+		// schema would, via blcTableDelta::delta()) fails with a duplicate-key error
+		// on any site that already has more than one link, because every existing
+		// row gets the same default '' before it's backfilled. The constraint is
+		// added explicitly, after backfilling, by blcDatabaseUpgrader::upgrade_url_hash().
 		$blc_db_schema = <<<EOM
 
 	CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}blc_filters` (
@@ -104,8 +110,7 @@ if ( ! function_exists( 'blc_get_db_schema' ) ) {
 		KEY `broken` (`broken`),
 		KEY `last_check_attempt` (`last_check_attempt`),
 		KEY `may_recheck` (`may_recheck`),
-		KEY `check_count` (`check_count`),
-		UNIQUE KEY `url_hash` (`url_hash`)
+		KEY `check_count` (`check_count`)
 
 	) {$charset_collate};
 

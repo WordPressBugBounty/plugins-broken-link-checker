@@ -228,17 +228,17 @@ if ( defined( 'BLC_ACTIVE' ) ) {
 			if ( BLC_DATABASE_VERSION !== $blc_config_manager->options['current_db_version'] ) {
 				require_once BLC_DIRECTORY_LEGACY . '/includes/admin/db-upgrade.php';
 
-				if ( is_multisite() ) {
-					$last_upgrade_time = intval( get_site_option( 'wpmudev_blc_last_db_upgrade', 0 ) );
-					$last_upgrade_diff = time() - $last_upgrade_time;
+				// Throttle upgrade attempts (on both single-site and multisite) so that a burst of
+				// concurrent requests can't all try to run the schema diff/ALTER queries at once.
+				// Without this, every request that sees a stale current_db_version re-runs the
+				// upgrade, and concurrent identical ALTER TABLE statements pile up waiting on the
+				// same metadata lock.
+				$last_upgrade_time = intval( get_site_option( 'wpmudev_blc_last_db_upgrade', 0 ) );
+				$last_upgrade_diff = time() - $last_upgrade_time;
 
-					if ( apply_filters( 'wpmudev_blc_db_upgrade_cooldown_sec', 30 ) <= $last_upgrade_diff ) {
-						update_site_option( 'wpmudev_blc_last_db_upgrade', time() );
+				if ( apply_filters( 'wpmudev_blc_db_upgrade_cooldown_sec', 30 ) <= $last_upgrade_diff ) {
+					update_site_option( 'wpmudev_blc_last_db_upgrade', time() );
 
-						// Also updates the DB ver. in options['current_db_version'].
-						blcDatabaseUpgrader::upgrade_database();
-					}
-				} else {
 					// Also updates the DB ver. in options['current_db_version'].
 					blcDatabaseUpgrader::upgrade_database();
 				}
