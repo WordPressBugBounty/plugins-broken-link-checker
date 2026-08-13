@@ -3,7 +3,7 @@ Contributors: managewp, wpmudev
 Tags: links, broken links, internal link, external link, broken images
 Requires at least: 5.2
 Tested up to: 7.0
-Stable tag: 2.4.11
+Stable tag: 2.4.13
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -207,6 +207,14 @@ We take plugin security incredibly seriously; if you have a bug or vulnerability
 6. Local Broken Link Checker engine settings
 
 == Changelog ==
+
+= 2.4.13 =
+* Fix: Fixed a fatal error that could occur when viewing broken links found in Template Parts and Templates.
+* Fix: Fixed "Look For Links In" checkboxes being unchecked by default, causing some content types to be skipped during scans.
+
+= 2.4.12 =
+* Fix: Fixed an issue with permissions allowing Editors to access Dashboard widget.
+* Fix: Patched a vulnerability issue (Credit: Jakub Herman).
 
 = 2.4.11 =
 * Fix: Fixed daily scan schedule time not being saved correctly in some cases.

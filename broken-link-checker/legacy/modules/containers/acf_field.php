@@ -247,7 +247,13 @@ class blcAcfMeta extends blcContainer {
 		if ( current_user_can( 'edit_post', $this->container_id ) ) {
 			$actions['edit'] = '<span class="edit"><a href="' . $this->get_edit_url() . '" title="' . esc_attr( __( 'Edit this item' ) ) . '">' . __( 'Edit' ) . '</a>';
 
-			if ( $this->current_user_can_delete() ) {
+			//Note: core's get_delete_post_link() has no special-case handling for
+			//Site Editor post types (unlike get_edit_post_link()), so calling it for
+			//them throws an ArgumentCountError. They're deleted via the Site Editor,
+			//not this legacy link, so we simply omit the action for them.
+			if ( $this->current_user_can_delete()
+				&& ! $this->is_site_editor_post_type( get_post_type( $this->container_id ) )
+			) {
 				if ( $this->can_be_trashed() ) {
 					$actions['trash'] = sprintf( "<span><a class='submitdelete' title='%s' href='%s'>%s</a>", esc_attr( __( 'Move this item to the Trash' ) ), get_delete_post_link( $this->container_id, '', false ), __( 'Trash' ) );
 				} else {
@@ -296,7 +302,19 @@ class blcAcfMeta extends blcContainer {
 			return '';
 		}
 
-		return apply_filters( 'get_edit_post_link', admin_url( sprintf( $post_type_object->_edit_link . $action, $post->ID ) ), $post->ID, $context );
+		$link = '';
+		if ( $post_type_object->_edit_link ) {
+			if ( 'wp_template' === $post->post_type || 'wp_template_part' === $post->post_type ) {
+				$slug = urlencode( get_stylesheet() . '//' . $post->post_name );
+				$link = admin_url( sprintf( $post_type_object->_edit_link, $post->post_type, $slug ) );
+			} elseif ( 'wp_navigation' === $post->post_type ) {
+				$link = admin_url( sprintf( $post_type_object->_edit_link, (string) $post->ID ) );
+			} else {
+				$link = admin_url( sprintf( $post_type_object->_edit_link . $action, $post->ID ) );
+			}
+		}
+
+		return apply_filters( 'get_edit_post_link', $link, $post->ID, $context );
 	}
 
 	/**

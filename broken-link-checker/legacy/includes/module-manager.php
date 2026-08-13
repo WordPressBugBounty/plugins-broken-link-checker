@@ -321,25 +321,17 @@ class blcModuleManager {
 	 * @return array Associative array of module data indexed by module ID.
 	 */
 	function get_active_modules() {
-		if ( isset( $this->plugin_conf->options['all_modules'] ) ) {
+		if ( ! empty( $this->plugin_conf->options['all_modules'] ) ) {
 			return $this->plugin_conf->options['all_modules'];
 		}
 
-		$active  = array();
-		$modules = $this->get_modules();
-
+		$active             = array();
+		$modules            = $this->get_modules();
 		$active_modules_ids = $this->get_active_modules_ids();
-		if ( $active_modules_ids ) {
-			foreach ( $active_modules_ids as $module_id ) {
-				if ( array_key_exists( $module_id, $modules ) ) {
-					$active[ $module_id ] = $modules[ $module_id ];
-				}
-			}
-		} elseif ( is_array( $this->default_active_modules ) ) {
-			foreach ( $this->default_active_modules as $module_id ) {
-				if ( array_key_exists( $module_id, $modules ) ) {
-					$active[ $module_id ] = $modules[ $module_id ];
-				}
+
+		foreach ( $active_modules_ids as $module_id ) {
+			if ( array_key_exists( $module_id, $modules ) ) {
+				$active[ $module_id ] = $modules[ $module_id ];
 			}
 		}
 
@@ -355,25 +347,71 @@ class blcModuleManager {
 	 * @return array An array of module IDs.
 	 */
 	public function get_active_modules_ids() {
-		if ( isset( $this->plugin_conf->options['active_modules'] ) ) {
+		if ( ! empty( $this->plugin_conf->options['active_modules'] ) ) {
 			return $this->plugin_conf->options['active_modules'];
 		}
 
-		$active  = array();
-		$modules = $this->get_modules();
-
-		if ( is_array( $this->default_active_modules ) ) {
-			foreach ( $this->default_active_modules as $module_id ) {
-				if ( array_key_exists( $module_id, $modules ) ) {
-					$active[] = $module_id;
-				}
-			}
-		}
+		$active = $this->get_default_active_module_ids();
 
 		$this->plugin_conf->options['active_modules'] = $active;
 		$this->plugin_conf->save_options();
 
 		return $this->plugin_conf->options['active_modules'];
+	}
+
+	/**
+	 * Build the list of module IDs that should be active on a fresh/reset site, filtered
+	 * against installed modules.
+	 *
+	 * Only 'post', 'page' and 'comment' are pre-checked among "container"-category modules
+	 * (the "Look for links in" checkboxes) — every other container (custom taxonomies, ...)
+	 * needs an explicit opt-in. 'custom_field' and 'acf_field' are the exception: they're
+	 * auto-included once something is actually configured for them to check, mirroring the
+	 * one-time exclusion that used to live in legacy/includes/activation.php. Modules marked
+	 * ModuleAlwaysActive are never excluded here regardless of category, since is_active()
+	 * (not just the checkbox UI) depends on them staying in this list.
+	 *
+	 * @return array An array of module IDs.
+	 */
+	protected function get_default_active_module_ids() {
+		if ( ! is_array( $this->default_active_modules ) ) {
+			return array();
+		}
+
+		$modules = $this->get_modules();
+
+		$default_containers = array(
+			'post',
+			'page',
+			'comment',
+			'youtube-iframe',
+			'dummy',
+		);
+		if ( ! empty( $this->plugin_conf->options['custom_fields'] ) ) {
+			$default_containers[] = 'custom_field';
+		}
+		if ( ! empty( $this->plugin_conf->options['acf_fields'] ) ) {
+			$default_containers[] = 'acf_field';
+		}
+
+		$active = array();
+		foreach ( $this->default_active_modules as $module_id ) {
+			if ( ! array_key_exists( $module_id, $modules ) ) {
+				continue;
+			}
+
+			$module_data      = $modules[ $module_id ];
+			$is_always_active = ! empty( $module_data['ModuleAlwaysActive'] );
+			$is_container     = isset( $module_data['ModuleCategory'] ) && 'container' === $module_data['ModuleCategory'];
+
+			if ( $is_container && ! $is_always_active && ! in_array( $module_id, $default_containers, true ) ) {
+				continue;
+			}
+
+			$active[] = $module_id;
+		}
+
+		return $active;
 	}
 
 	/**

@@ -180,6 +180,24 @@ class blcContainer {
 	}
 
 	/**
+	 * Whether the given post type is one of the Site Editor's block-theme
+	 * post types (Templates, Template Parts).
+	 *
+	 * Core's _edit_link format for these types takes two %s placeholders
+	 * (post type + slug) instead of the usual one, and core's
+	 * get_delete_post_link() has no special-case handling for them at all.
+	 * Container UI code must not build edit/trash/delete links for these
+	 * post types the "normal" way - see get_edit_post_link() in
+	 * wp-includes/link-template.php for the core logic this mirrors.
+	 *
+	 * @param string $post_type
+	 * @return bool
+	 */
+	protected function is_site_editor_post_type( $post_type ) {
+		return in_array( $post_type, array( 'wp_template', 'wp_template_part' ), true );
+	}
+
+	/**
 	 * Get the value of the specified field of the object wrapped by this container.
 	 *
 	 * @access protected

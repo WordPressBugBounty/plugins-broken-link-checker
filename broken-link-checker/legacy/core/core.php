@@ -4109,7 +4109,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 		 * @return bool
 		 */
 		function server_too_busy() {
-			if ( ! $this->conf->options['enable_load_limit'] || ! isset( $this->conf->options['server_load_limit'] ) ) {
+			if ( ! $this->conf->options['enable_load_limit'] || empty( $this->conf->options['server_load_limit'] ) ) {
 				return false;
 			}
 

@@ -74,7 +74,13 @@ trait blcTaxonomyContainerUI {
 			);
 		}
 
-		if ( current_user_can( $post_type_object->cap->delete_post, $this->container_id ) ) {
+		//Note: core's get_delete_post_link() has no special-case handling for
+		//Site Editor post types (unlike get_edit_post_link()), so calling it for
+		//them throws an ArgumentCountError. They're deleted via the Site Editor,
+		//not this legacy link, so we simply omit the action for them.
+		if ( current_user_can( $post_type_object->cap->delete_post, $this->container_id )
+			&& ! $this->is_site_editor_post_type( $post->post_type )
+		) {
 			$actions['trash'] = sprintf(
 				'<span class="trash"><a href="%s" title="%s">%s</a></span>',
 				esc_url( get_delete_post_link( $this->container_id, '', false ) ),
@@ -111,11 +117,18 @@ trait blcTaxonomyContainerUI {
 			return '';
 		}
 
-		return apply_filters(
-			'get_edit_post_link',
-			admin_url( sprintf( $post_type_object->_edit_link . '&action=edit', $post->ID ) ),
-			$post->ID,
-			'display'
-		);
+		$link = '';
+		if ( $post_type_object->_edit_link ) {
+			if ( 'wp_template' === $post->post_type || 'wp_template_part' === $post->post_type ) {
+				$slug = urlencode( get_stylesheet() . '//' . $post->post_name );
+				$link = admin_url( sprintf( $post_type_object->_edit_link, $post->post_type, $slug ) );
+			} elseif ( 'wp_navigation' === $post->post_type ) {
+				$link = admin_url( sprintf( $post_type_object->_edit_link, (string) $post->ID ) );
+			} else {
+				$link = admin_url( sprintf( $post_type_object->_edit_link . '&action=edit', $post->ID ) );
+			}
+		}
+
+		return apply_filters( 'get_edit_post_link', $link, $post->ID, 'display' );
 	}
 }

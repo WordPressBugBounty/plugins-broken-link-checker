@@ -88,21 +88,27 @@ class Controller extends Admin_Page {
 		$this->menu_slug   = 'blc_local';
 		$this->position    = 1;
 
-		if ( Settings::instance()->get( 'use_legacy_blc_version' ) && ! empty( $local_settings->dashboard_widget_capability ) ) {
-			if ( in_array(
-				$local_settings->get( 'dashboard_widget_capability' ),
-				array(
-					'edit_others_posts',
-					'manage_options',
-				),
-				false
-			) ) {
-				$page_caps = $local_settings->get( 'dashboard_widget_capability' );
-			}
+		if ( Settings::instance()->get( 'use_legacy_blc_version' ) ) {
+			$widget_capability = $local_settings->get( 'dashboard_widget_capability' );
 
-			if ( 'do_not_allow' === $local_settings->get( 'dashboard_widget_capability' ) ) {
-				// $page_caps = 'unfiltered_html';
-				$page_caps = 'administrator';
+			if ( ! empty( $widget_capability ) ) {
+				// If the capability is one of the capabilities that can be used for a menu page, use it.
+				if (
+					in_array(
+						$widget_capability,
+						array(
+							'edit_others_posts',
+							'manage_options',
+						),
+						true
+					)
+				) {
+					$page_caps = $widget_capability;
+				}
+
+				if ( 'do_not_allow' === $widget_capability ) {
+					$page_caps = 'administrator';
+				}
 			}
 		}
 

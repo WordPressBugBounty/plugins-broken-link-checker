@@ -562,7 +562,13 @@ class blcAnyPostContainer extends blcContainer {
 			);
 
 			//Trash/Delete link
-			if ( current_user_can( $post_type_object->cap->delete_post, $this->container_id ) ) {
+			//Note: core's get_delete_post_link() has no special-case handling for
+			//Site Editor post types (unlike get_edit_post_link()), so calling it for
+			//them throws an ArgumentCountError. They're deleted via the Site Editor,
+			//not this legacy link, so we simply omit the action for them.
+			if ( current_user_can( $post_type_object->cap->delete_post, $this->container_id )
+				&& ! $this->is_site_editor_post_type( $post->post_type )
+			) {
 				if ( $this->can_be_trashed() ) {
 					$actions['trash'] = sprintf(
 						"<span class='trash'><a class='submitdelete' title='%s' href='%s'>%s</a>",
