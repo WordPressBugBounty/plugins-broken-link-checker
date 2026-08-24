@@ -193,6 +193,10 @@ class Admin {
 	 * @param string $plugin Plugin identifier.
 	 */
 	public function render( $plugin = 'default' ) {
+		// only render on appropriate capability.
+		if ( ! ( is_multisite() ? current_user_can( 'manage_network_options' ) : current_user_can( 'manage_options' ) ) ) {
+			return;
+		}
 		if ( ! empty( $plugin ) ) {
 			$this->plugin = $plugin;
 		}
@@ -286,7 +290,9 @@ class Admin {
 		// Prepare redirect URL.
 		$redirect_url = add_query_arg( array( 'hub_connector_callback' => 1 ), $current_url );
 
-		$auth_nonce = wp_create_nonce( 'auth_nonce' );
+		// fool-proof, in normal condition this enqueue_assets method won't be called without access.
+		$has_access = is_multisite() ? current_user_can( 'manage_network_options' ) : current_user_can( 'manage_options' );
+		$auth_nonce = $has_access ? wp_create_nonce( 'auth_nonce' ) : '';
 
 		// Extra arguments.
 		$extra_args = $this->get_plugin_extra_args_from_screen();
@@ -307,7 +313,7 @@ class Admin {
 			'nonce'             => wp_create_nonce( 'wp_rest' ),
 			'is_syncing'        => false,
 			'is_team_selection' => false,
-			'has_access'        => current_user_can( 'manage_options' ),
+			'has_access'        => $has_access,
 			'is_logged_in'      => API::get()->is_logged_in(),
 			// Not being used for literal output / DB insert.
 			// phpcs:disable WordPress.Security.NonceVerification.Recommended
@@ -376,7 +382,7 @@ class Admin {
 		}
 
 		// Should be capable to perform the actions.
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! ( is_multisite() ? current_user_can( 'manage_network_options' ) : current_user_can( 'manage_options' ) ) ) {
 			return $this->update_vars( array( 'has_access' => false ) );
 		}
 

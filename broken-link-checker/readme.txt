@@ -2,8 +2,8 @@
 Contributors: managewp, wpmudev
 Tags: links, broken links, internal link, external link, broken images
 Requires at least: 5.2
-Tested up to: 7.0
-Stable tag: 2.4.13
+Tested up to: 7.1
+Stable tag: 2.4.14
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -207,6 +207,16 @@ We take plugin security incredibly seriously; if you have a bug or vulnerability
 6. Local Broken Link Checker engine settings
 
 == Changelog ==
+
+= 2.4.14 =
+* Fix: Fixed scheduled scans running more than once and duplicate scan report emails being sent when the site uses a 12-hour time format.
+* Fix: Fixed the scan report email showing an incorrect broken links count when links were ignored after the scan.
+* Fix: Fixed broken links being missing from the scan report email when their source post could not be resolved.
+* Fix: Fixed scheduled scans running at the wrong time or on the wrong day for sites with a timezone other than UTC.
+* Fix: Fixed the scan schedule allowing the same recipient to be added more than once, which resulted in duplicate scan report emails.
+
+= 2.4.13.1 =
+* Fix: Patched a cross-site scripting (XSS) issue.
 
 = 2.4.13 =
 * Fix: Fixed a fatal error that could occur when viewing broken links found in Template Parts and Templates.

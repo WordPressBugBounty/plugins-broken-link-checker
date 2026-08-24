@@ -50,10 +50,10 @@ class Data {
 
 		// Attempt to get from parsed data.
 		if ( ! empty( $parts['scheme'] ) && ! empty( $parts['host'] ) ) {
-			return "{$parts['scheme']}://{$parts['host']}" . add_query_arg( null, null );
+			return "{$parts['scheme']}://{$parts['host']}" . add_query_arg( array() );
 		}
 
-		return add_query_arg( null, null );
+		return add_query_arg( array() );
 	}
 
 	/**
@@ -465,5 +465,27 @@ class Data {
 		}
 
 		return in_array( $access, $accesses, true );
+	}
+
+	/**
+	 * Get full WPMU DEV Hosting ID.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @return string
+	 */
+	public function get_full_wpmu_dev_hosting_id(): string {
+		if ( ! defined( 'WPMUDEV_HOSTING_SITE_ID' ) && ! isset( $_SERVER['WPMUDEV_HOSTED'] ) ) {
+			return '';
+		}
+
+		$server_id  = defined( 'WPMUDEV_HOSTING_SITE_ID' ) ? WPMUDEV_HOSTING_SITE_ID : gethostname();
+		$website_id = ( defined( 'WPMUDEV_HOSTING_WEBSITE_ID' ) && ! empty( WPMUDEV_HOSTING_WEBSITE_ID ) ) ? WPMUDEV_HOSTING_WEBSITE_ID : '';
+
+		if ( empty( $website_id ) ) { // non shared sub-hosting.
+			return $server_id; // return server id.
+		}
+
+		return implode( '-', array( $website_id, $server_id ) );
 	}
 }

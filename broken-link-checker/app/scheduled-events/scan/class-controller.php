@@ -126,21 +126,21 @@ class Controller extends Base {
 			return false;
 		}
 
-		// For some reason this is called multiple times
-		$cur_date           = new \DateTimeImmutable();
-		$scan_results       = Settings::instance()->get( 'scan_results' );
-		$last_timestamp     = $scan_results['end_time'] ?? null;
-		$last_scan_date     = new \DateTimeImmutable( date( 'Y-m-d H:i:s', $last_timestamp ) );
-		$interval_from_last = $cur_date->diff( $last_scan_date );
-
-		if ( 'in_progress' === Settings::instance()->get( 'scan_status' ) || ( ! empty( $last_timestamp ) && abs( $interval_from_last->format( '%h' ) ) < 1 ) ) {
-			// Since we return `false` at this point, `$this->set_scan_schedule()` will be called from `process_scheduled_event()`. No need to run it here too.
+		if ( 'in_progress' === Settings::instance()->get( 'scan_status' ) ) {
 			return false;
 		}
-		/**
-		 * Removed scan condition that checks upcoming scan schedule which blocked scan if that time frame is more than 5 hours to reach.
-		 * @since 2.4.3
-		 */
+
+		$scan_results   = Settings::instance()->get( 'scan_results' );
+		$last_timestamp = ! empty( $scan_results['end_time'] ) ? intval( $scan_results['end_time'] ) : null;
+
+		if ( ! empty( $last_timestamp ) ) {
+			$elapsed_seconds = time() - $last_timestamp;
+
+			if ( $elapsed_seconds < ( 12 * HOUR_IN_SECONDS ) ) {
+				return false;
+			}
+		}
+
 		return true;
 	}
 
@@ -216,7 +216,11 @@ class Controller extends Base {
 		}
 
 		$frequency     = $schedule['frequency'];
-		$schedule_time = $schedule['time'];
+		$schedule_time = self::normalize_schedule_time( $schedule['time'] );
+
+		if ( empty( $schedule_time ) ) {
+			return null;
+		}
 
 		if ( 'daily' === $frequency ) {
 			// Return the timestamp for the next daily scan.
@@ -225,12 +229,12 @@ class Controller extends Base {
 
 		if ( 'monthly' === $frequency ) {
 			// For monthly frequency, we need to get the current day of the month and the scheduled month days.
-			$current_day_num = gmdate( 'd', $current_time );
-			$schedule_days   = $schedule['monthdays'] ?? array();
+			$current_day_num = intval( self::local_datetime( $current_time )->format( 'j' ) );
+			$schedule_days   = array_map( 'intval', $schedule['monthdays'] ?? array() );
 		} else {
 			// For weekly frequency, we need to get the current day of the week and the scheduled weekdays.
-			$current_day_num = gmdate( 'w', $current_time );
-			$schedule_days   = $schedule['days'] ?? array();
+			$current_day_num = intval( self::local_datetime( $current_time )->format( 'w' ) );
+			$schedule_days   = array_map( 'intval', $schedule['days'] ?? array() );
 		}
 
 		if ( empty( $schedule_days ) ) {
@@ -263,31 +267,67 @@ class Controller extends Base {
 	}
 
 	/**
+	 * Returns a timestamp as a DateTimeImmutable in the site's timezone.
+	 *
+	 * Schedule decisions are made on the site's calendar. Reading a timestamp with
+	 * gmdate() - or with date_i18n(), which reproduces the UTC wall clock when handed
+	 * an explicit timestamp - asks UTC instead, and the two disagree for part of every
+	 * day on any site with a non-zero offset.
+	 *
+	 * @since 2.4.15
+	 *
+	 * @param int $timestamp Unix timestamp.
+	 *
+	 * @return \DateTimeImmutable
+	 */
+	private static function local_datetime( int $timestamp ): \DateTimeImmutable {
+		return ( new \DateTimeImmutable( '@' . $timestamp ) )->setTimezone( wp_timezone() );
+	}
+
+	/**
+	 * Normalizes a stored schedule time to the 24-hour "H:i" format.
+	 *
+	 * The time is saved in whichever format the site's Time Format setting uses, so it
+	 * can arrive as "4:00 am" just as easily as "04:00". The day lookup in
+	 * find_next_scheduled_day() compares it against date_i18n( 'H:i' ) as a plain
+	 * string, and "04:00" < "4:00 am" evaluates to true because '0' sorts before '4'.
+	 *
+	 * On a 12-hour site that made the scan look due later today when it had in fact
+	 * just finished, so the next single event was scheduled in the past and WP Cron
+	 * kept re-firing it until the day rolled over - the duplicate scans and repeated
+	 * report emails reported in BLC-840.
+	 *
+	 * @since 2.4.14
+	 *
+	 * @param string $time The scheduled time in any of the supported formats.
+	 *
+	 * @return string The time as "H:i", or an empty string when it can not be parsed.
+	 */
+	private static function normalize_schedule_time( string $time ): string {
+		$parsed = date_create_immutable( $time, wp_timezone() );
+
+		return $parsed instanceof \DateTimeImmutable ? $parsed->format( 'H:i' ) : '';
+	}
+
+	/**
 	 * Returns the timestamp for the next daily scan.
 	 *
-	 * Uses Utilities::str_to_time() (DateTimeImmutable-based) rather than
-	 * date_create_from_format().
+	 * Both candidates are built from $current_time in the site's timezone rather than
+	 * from a relative string parsed against the real clock, so the supplied current
+	 * time is honoured and the result lands on the intended local day.
 	 *
-	 * The schedule time accepts whichever format the site's Time Format setting
-	 * has (e.g. "3:00 pm" or "15:30"), and that setting can change at any
-	 * point after the schedule was saved.
-	 *
-	 * A fixed-format parser can silently mismatch and fail
-	 * Function Utilities::str_to_time() parses either form without needing to
-	 * know which one was used, matching how the weekly/monthly builders below
-	 * already build their timestamps.
-	 *
-	 * @param string $time The time of the day, e.g. "3:00 pm" or "15:30".
+	 * @param string $time The time of the day in 24-hour "H:i" form, as returned by
+	 *                     normalize_schedule_time().
 	 * @param int    $current_time The current timestamp.
 	 *
 	 * @return int
 	 */
 	private static function build_daily_schedule_timestamp( string $time, int $current_time ): int {
-		$today_timestamp = Utilities::str_to_time( "today {$time}" );
+		$today_timestamp = self::local_datetime( $current_time )->modify( $time )->getTimestamp();
 
 		if ( $current_time > $today_timestamp ) {
 			// Current time is later than the scheduled time, so schedule for tomorrow.
-			return Utilities::str_to_time( "tomorrow {$time}" );
+			return self::local_datetime( $current_time )->modify( '+1 day' )->modify( $time )->getTimestamp();
 		}
 
 		// Current time is earlier than or equal to the scheduled time, so schedule for today.
@@ -314,7 +354,7 @@ class Controller extends Base {
 			// If today is a scheduled day, check if the scheduled time has already passed.
 			$day_key = array_keys( $days, $current_day_num, true )[0];
 
-			if ( date_i18n( 'H:i', $current_time ) < $time ) {
+			if ( self::local_datetime( $current_time )->format( 'H:i' ) < $time ) {
 				$schedule_today = true;
 			} elseif ( array_key_exists( $day_key + 1, $days ) ) {
 
@@ -365,14 +405,29 @@ class Controller extends Base {
 		// Find the next scheduled day and whether to schedule for today or the next week.
 		$result = self::find_next_scheduled_day( $days, $current_day_num, $time, $current_time );
 
+		$local = self::local_datetime( $current_time );
+
 		if ( $result['schedule_today'] ) {
-			return Utilities::str_to_time( "today {$time}" );
+			return $local->modify( $time )->getTimestamp();
 		}
 
-		$next_day_num = $result['next_day_num'];
-		// Get name of the next scheduled day (e.g., "Monday", "Tuesday") based on its number.
-		$day_name     = gmdate( 'l', Utilities::str_to_time( "Sunday +{$next_day_num} days" ) );
-		return Utilities::str_to_time( "next {$day_name} {$time}" );
+		/*
+		 * Count whole days forward to the next scheduled weekday.
+		 *
+		 * This previously resolved the weekday number to a name with
+		 * gmdate( 'l', Utilities::str_to_time( "Sunday +N days" ) ). The inner call
+		 * returns local midnight, which on any site east of UTC is still the previous
+		 * day in UTC, so gmdate() named the day before the one requested and a "Sunday"
+		 * schedule became "next Saturday".
+		 */
+		$days_ahead = ( intval( $result['next_day_num'] ) - intval( $current_day_num ) + 7 ) % 7;
+
+		if ( 0 === $days_ahead ) {
+			// Today is the only scheduled day and its time has passed, so go a week out.
+			$days_ahead = 7;
+		}
+
+		return $local->modify( "+{$days_ahead} days" )->modify( $time )->getTimestamp();
 	}
 
 	/**
@@ -388,19 +443,23 @@ class Controller extends Base {
 	private static function build_monthly_schedule_timestamp( string $time, array $days, $current_day_num, int $current_time ): int {
 		$result = self::find_next_scheduled_day( $days, $current_day_num, $time, $current_time );
 
+		$local = self::local_datetime( $current_time );
+
 		if ( $result['schedule_today'] ) {
-			return Utilities::str_to_time( "today {$time}" );
+			return $local->modify( $time )->getTimestamp();
 		}
 
-		$next_day_num = $result['next_day_num'];
+		$next_day_num = intval( $result['next_day_num'] );
 
 		if ( $result['move_to_next_period'] ) {
 			// Subtracting one because we're offsetting from "first day of next month".
-			--$next_day_num;
-			return Utilities::str_to_time( "first day of next month +{$next_day_num} days {$time}" );
+			return $local->modify( 'first day of next month' )
+				->modify( '+' . ( $next_day_num - 1 ) . ' days' )
+				->modify( $time )
+				->getTimestamp();
 		}
 
-		$days_diff = intval( $next_day_num ) - intval( $current_day_num );
-		return Utilities::str_to_time( "+{$days_diff} days {$time}" );
+		$days_diff = $next_day_num - intval( $current_day_num );
+		return $local->modify( "+{$days_diff} days" )->modify( $time )->getTimestamp();
 	}
 }

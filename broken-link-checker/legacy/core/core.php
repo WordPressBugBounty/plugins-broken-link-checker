@@ -2109,7 +2109,7 @@ if ( ! class_exists( 'wsBrokenLinkChecker' ) ) {
 			?>
 
             <script type='text/javascript'>
-                var blc_current_filter = '<?php echo $filter_id; ?>';
+                var blc_current_filter = '<?php echo esc_js( $filter_id ); ?>';
                 var blc_is_broken_filter = <?php echo $current_filter['is_broken_filter'] ? 'true' : 'false'; ?>;
                 var blc_current_base_filter = '<?php echo esc_js( $current_filter['base_filter'] ); ?>';
                 var blc_suggestions_enabled = <?php echo $this->conf->options['suggestions_enabled'] ? 'true' : 'false'; ?>;

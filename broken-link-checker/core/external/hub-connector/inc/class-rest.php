@@ -10,9 +10,9 @@
 
 namespace WPMUDEV\Hub\Connector;
 
-use WP_REST_Server;
-use WP_REST_Response;
 use WP_REST_Request;
+use WP_REST_Response;
+use WP_REST_Server;
 
 /**
  * Class Rest
@@ -54,7 +54,7 @@ class Rest {
 					'methods'             => WP_REST_Server::EDITABLE,
 					'callback'            => array( $this, 'sync' ),
 					'permission_callback' => function () {
-						return current_user_can( 'manage_options' );
+						return is_multisite() ? current_user_can( 'manage_network_options' ) : current_user_can( 'manage_options' );
 					},
 					'args'                => array(
 						'force' => array(
@@ -77,7 +77,7 @@ class Rest {
 					'methods'             => WP_REST_Server::EDITABLE,
 					'callback'            => array( $this, 'logout' ),
 					'permission_callback' => function () {
-						return current_user_can( 'manage_options' );
+						return is_multisite() ? current_user_can( 'manage_network_options' ) : current_user_can( 'manage_options' );
 					},
 					'args'                => array(),
 				),

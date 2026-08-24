@@ -497,7 +497,7 @@ class blcWPHttp extends blcHttpCheckerBase {
 		$log .= " ===\n\n";
 
 		if ( $result['message'] ) {
-			$log .= $result['message'] . "\n";
+			$log .= esc_html( $result['message'] ) . "\n";
 		}
 
 		if ( is_wp_error( $request ) ) {

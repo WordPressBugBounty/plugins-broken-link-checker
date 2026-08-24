@@ -166,7 +166,7 @@ class Remote {
 	 */
 	public function validate_hash( $hash, $id, $json ) {
 		// Validation.
-		if ( empty( $hash ) || empty( $id ) || empty( $json ) ) {
+		if ( ! API::get()->has_api_key() || empty( $hash ) || empty( $id ) || empty( $json ) ) {
 			return false;
 		}
 
@@ -338,6 +338,7 @@ class Remote {
 	 * only one package at a time.
 	 *
 	 * @since 1.0.0
+	 * @since 1.1.0 Force signature verifications on plugins/themes list requests
 	 *
 	 * @param object $params Parameters passed in json body.
 	 * @param string $action The action name that was called.
@@ -357,7 +358,18 @@ class Remote {
 		);
 
 		// Process plugins.
-		if ( isset( $params->plugins ) && is_array( $params->plugins ) ) {
+		if ( ! empty( $params->plugins ) && is_array( $params->plugins ) ) {
+			$verified = $this->verify_signed_data( $params->plugins, $params->signed_plugins ?? '' );
+			if ( ! $verified ) {
+				$errors[] = array(
+					'file'    => 'plugins',
+					'code'    => 'INS.99',
+					'message' => 'Invalid plugins signature',
+					'log'     => false,
+				);
+				// bail.
+				wp_send_json_error( compact( 'installed', 'errors' ) );
+			}
 			foreach ( $params->plugins as $plugin ) {
 				// Perform installation.
 				$success = Upgrader::get()->install( $plugin, 'plugin', $options );
@@ -381,7 +393,18 @@ class Remote {
 		}
 
 		// Process themes.
-		if ( isset( $params->themes ) && is_array( $params->themes ) ) {
+		if ( ! empty( $params->themes ) && is_array( $params->themes ) ) {
+			$verified = $this->verify_signed_data( $params->themes, $params->signed_themes ?? '' );
+			if ( ! $verified ) {
+				$errors[] = array(
+					'file'    => 'themes',
+					'code'    => 'INS.99',
+					'message' => 'Invalid themes signature',
+					'log'     => false,
+				);
+				// bail.
+				wp_send_json_error( compact( 'installed', 'errors' ) );
+			}
 			foreach ( $params->themes as $theme ) {
 				// Perform installation.
 				$success = Upgrader::get()->install( $theme, 'theme', $options );
@@ -673,6 +696,58 @@ class Remote {
 	 */
 	protected function is_hub_request() {
 		return ! empty( $_GET['wpmudev-hub'] ); // phpcs:ignore
+	}
+
+	/**
+	 * Validate Signed Data
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param mixed  $data        raw data.
+	 * @param string $signed_data base64_encoded and json_encoded.
+	 *
+	 * @return bool
+	 */
+	public function verify_signed_data( $data, string $signed_data ): bool {
+		try {
+			if ( '' === $signed_data ) {
+				return false;
+			}
+
+			$signature = base64_decode( $signed_data, true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+			if ( false === $signature || '' === $signature ) {
+				return false;
+			}
+
+			if ( ! class_exists( '\Crypt_RSA', false ) ) {
+				require_once plugin_dir_path( WPMUDEV_HUB_CONNECTOR_FILE ) . 'lib/PHPSecLib/Crypt/RSA.php';
+			}
+
+			$rsa = new \Crypt_RSA();
+			$rsa->setHash( 'sha256' );
+			$rsa->setMGFHash( 'sha256' );
+			$rsa->setSaltLength( 32 );
+			$rsa->setSignatureMode( CRYPT_RSA_SIGNATURE_PSS );
+
+			$public_key_file = apply_filters( 'wpmudev_hub_connector_remote_verify_sign_pub_file_path', plugin_dir_path( WPMUDEV_HUB_CONNECTOR_FILE ) . 'keys/dashboard.pub' );
+			if ( ! is_readable( $public_key_file ) ) {
+				return false;
+			}
+
+			$public_key = file_get_contents( $public_key_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			if ( false === $public_key || ! $rsa->loadKey( $public_key, CRYPT_RSA_PUBLIC_FORMAT_PKCS1 ) ) {
+				return false;
+			}
+
+			// signature is encoded. retain slashes as is from the data.
+			if ( ! $rsa->verify( wp_json_encode( $data, JSON_UNESCAPED_SLASHES ), $signature ) ) {
+				return false;
+			}
+
+			return true;
+		} catch ( \Throwable $e ) {
+			return false;
+		}
 	}
 }
 

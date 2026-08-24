@@ -484,8 +484,8 @@ if ( ! class_exists( 'blcLink' ) ) {
 				if ( $this->dismissed ) {
 					$this->log .= sprintf(
 						"Restoring a dismissed link. \nOld status: \n%s\nNew status: \n%s\n",
-						$this->result_hash,
-						$new_result_hash
+						esc_html( $this->result_hash ),
+						esc_html( $new_result_hash )
 					);
 				}
 				$this->dismissed = false;

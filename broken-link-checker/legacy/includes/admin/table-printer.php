@@ -655,7 +655,13 @@ if ( ! class_exists( 'blcTablePrinter' ) ) {
 						<li><strong><?php _e( 'Log', 'broken-link-checker' ); ?>:</strong>
 					<span class='blc_log'>
 					<?php
-						print nl2br( $link->log );
+						// The log is stored as pre-escaped HTML: checkers escape untrusted data
+						// before it is appended. Sanitise rather than esc_html() here so that content
+						// escaped at write time is not double-escaped, while neutralising any unescaped
+						// payload already stored by an earlier version.
+						print nl2br(
+							wp_kses( $link->log, array( 'em' => array(), 'strong' => array() ) )
+						);
 					?>
 					</span></li>
 					</ol>

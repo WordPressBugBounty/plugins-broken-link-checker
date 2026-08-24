@@ -2,14 +2,14 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Broken Link Checker 2.4.11\n"
+"Project-Id-Version: Broken Link Checker 2.4.14\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/build\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-07T11:31:04+00:00\n"
+"POT-Creation-Date: 2026-08-24T07:34:41+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 
@@ -18,7 +18,7 @@ msgstr ""
 #: app/admin-pages/cloud-page/class-controller.php:108
 #: app/admin-pages/cloud-submenu/class-controller.php:67
 #: app/emails/recipient-activation/class-controller.php:88
-#: app/emails/scan-report/class-controller.php:101
+#: app/emails/scan-report/class-controller.php:110
 #: core/external/plugins-cross-sell-page/core/plugins-list.php:116
 #: legacy/core/core.php:4135
 #: app/admin-pages/cloud-page/assets/js/layouts/dashboard/resultsArea.js:248
@@ -63,8 +63,8 @@ msgstr ""
 
 #: app/action-links/plugin/class-controller.php:92
 #: app/admin-pages/local-submenu/class-view.php:66
-#: app/emails/scan-report/class-controller.php:80
-#: app/emails/scan-report/class-view.php:164
+#: app/emails/scan-report/class-controller.php:89
+#: app/emails/scan-report/class-view.php:154
 #: legacy/core/core.php:514
 #: legacy/core/core.php:515
 #: legacy/includes/link-query.php:37
@@ -113,7 +113,7 @@ msgstr ""
 #: app/admin-notices/multisite/class-view.php:64
 #: legacy/core/core.php:636
 #: legacy/includes/admin/table-printer.php:334
-#: legacy/includes/admin/table-printer.php:765
+#: legacy/includes/admin/table-printer.php:771
 msgid "Dismiss"
 msgstr ""
 
@@ -215,7 +215,7 @@ msgid "Broken links reports activation"
 msgstr ""
 
 #: app/emails/recipient-activation/class-controller.php:81
-#: app/emails/scan-report/class-controller.php:70
+#: app/emails/scan-report/class-controller.php:79
 msgid "Hi {{USERNAME}}"
 msgstr ""
 
@@ -224,22 +224,22 @@ msgid "Confirm Subscription"
 msgstr ""
 
 #: app/emails/recipient-activation/class-controller.php:92
-#: app/emails/scan-report/class-controller.php:106
+#: app/emails/scan-report/class-controller.php:115
 msgid "Link to WPMU DEV Home page"
 msgstr ""
 
 #: app/emails/recipient-activation/class-controller.php:93
-#: app/emails/scan-report/class-controller.php:107
+#: app/emails/scan-report/class-controller.php:116
 msgid "Build A Better WordPress Business"
 msgstr ""
 
 #: app/emails/recipient-activation/class-controller.php:94
-#: app/emails/scan-report/class-controller.php:108
+#: app/emails/scan-report/class-controller.php:117
 msgid "INCSUB PO BOX 163, ALBERT PARK, VICTORIA.3206 AUSTRALIA"
 msgstr ""
 
 #: app/emails/recipient-activation/class-controller.php:96
-#: app/emails/scan-report/class-controller.php:110
+#: app/emails/scan-report/class-controller.php:119
 msgid "Unsubscribe"
 msgstr ""
 
@@ -248,60 +248,60 @@ msgid "Broken Link Notification"
 msgstr ""
 
 #: app/emails/recipient-activation/class-model.php:106
-#: app/emails/scan-report/class-view.php:229
+#: app/emails/scan-report/class-view.php:390
 msgid "Follow us"
 msgstr ""
 
-#: app/emails/scan-report/class-controller.php:69
+#: app/emails/scan-report/class-controller.php:78
 msgid "Broken Link Report for"
 msgstr ""
 
-#: app/emails/scan-report/class-controller.php:72
+#: app/emails/scan-report/class-controller.php:81
 msgid "Here's your latest broken link summary generated on {{SCANDATE}}."
 msgstr ""
 
-#: app/emails/scan-report/class-controller.php:76
+#: app/emails/scan-report/class-controller.php:85
 msgid "Summary"
 msgstr ""
 
-#: app/emails/scan-report/class-controller.php:77
+#: app/emails/scan-report/class-controller.php:86
 msgid "Here are your latest broken link test results."
 msgstr ""
 
-#: app/emails/scan-report/class-controller.php:86
+#: app/emails/scan-report/class-controller.php:95
 #: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/summary.js:63
 msgid "Total Links"
 msgstr ""
 
-#: app/emails/scan-report/class-controller.php:89
+#: app/emails/scan-report/class-controller.php:98
 #: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/summary.js:72
 msgid "Unique URLs"
 msgstr ""
 
-#: app/emails/scan-report/class-controller.php:95
+#: app/emails/scan-report/class-controller.php:104
 msgid "Broken link report"
 msgstr ""
 
-#: app/emails/scan-report/class-controller.php:96
+#: app/emails/scan-report/class-controller.php:105
 msgid "The list below shows a maximum of 20 broken links. Click the View Full Report button to see the full list."
 msgstr ""
 
-#: app/emails/scan-report/class-controller.php:98
+#: app/emails/scan-report/class-controller.php:107
 #: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/viewFullReportButton.js:14
 msgid "View Full Report"
 msgstr ""
 
-#: app/emails/scan-report/class-controller.php:98
+#: app/emails/scan-report/class-controller.php:107
 msgid "View Report"
 msgstr ""
 
 #. translators: 1: opening <a> tag 2: closing </a> tag
-#: app/emails/scan-report/class-controller.php:133
+#: app/emails/scan-report/class-controller.php:142
 #, php-format
 msgid "Are you enjoying the new Broken Link Checker? Share your valuable feedback on wordpress.org to help us further enhance and support our plugin. Give us feedback %shere%s."
 msgstr ""
 
-#: app/emails/scan-report/class-controller.php:180
+#: app/emails/scan-report/class-controller.php:189
 #: app/virtual-posts/recipient-activation/class-controller.php:29
 msgid "Broken links reports"
 msgstr ""
@@ -310,11 +310,7 @@ msgstr ""
 msgid "BLC Report"
 msgstr ""
 
-#: app/emails/scan-report/class-view.php:103
-msgid "Unknown"
-msgstr ""
-
-#: app/emails/scan-report/class-view.php:167
+#: app/emails/scan-report/class-view.php:157
 #: legacy/core/core.php:1081
 #: legacy/includes/admin/table-printer.php:251
 #: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/activeScheduleRow.js:282
@@ -322,8 +318,12 @@ msgstr ""
 msgid "Status"
 msgstr ""
 
-#: app/emails/scan-report/class-view.php:170
+#: app/emails/scan-report/class-view.php:160
 msgid "Source URL"
+msgstr ""
+
+#: app/emails/scan-report/class-view.php:189
+msgid "Unknown"
 msgstr ""
 
 #: app/http-requests/scan/class-controller.php:156
@@ -388,26 +388,30 @@ msgstr ""
 msgid "Invalid email address"
 msgstr ""
 
-#: app/rest-endpoints/avatars/class-controller.php:118
+#: app/rest-endpoints/avatars/class-controller.php:125
 msgid "You can not fetch avatars."
 msgstr ""
 
-#: app/rest-endpoints/avatars/class-controller.php:147
+#: app/rest-endpoints/avatars/class-controller.php:154
 msgid "Avatar by email."
 msgstr ""
 
-#: app/rest-endpoints/avatars/class-controller.php:152
+#: app/rest-endpoints/avatars/class-controller.php:159
 msgid "Auto-confirmed when email belongs to user."
 msgstr ""
 
-#: app/rest-endpoints/avatars/class-controller.php:157
+#: app/rest-endpoints/avatars/class-controller.php:164
+msgid "Id of the registered user owning the email address. 0 when the email address does not belong to a user."
+msgstr ""
+
+#: app/rest-endpoints/avatars/class-controller.php:169
 #: app/rest-endpoints/hub-connector/class-controller.php:185
 #: app/rest-endpoints/scan/class-controller.php:198
 #: app/rest-endpoints/settings/includes/class-schema.php:99
 msgid "Response message."
 msgstr ""
 
-#: app/rest-endpoints/avatars/class-controller.php:162
+#: app/rest-endpoints/avatars/class-controller.php:174
 #: app/rest-endpoints/hub-connector/class-controller.php:190
 #: app/rest-endpoints/scan/class-controller.php:208
 #: app/rest-endpoints/settings/includes/class-schema.php:104
@@ -489,19 +493,19 @@ msgstr ""
 msgid "Settings saved"
 msgstr ""
 
-#: app/rest-endpoints/settings/class-controller.php:474
+#: app/rest-endpoints/settings/class-controller.php:538
 msgid "Schedule frequency was not set"
 msgstr ""
 
-#: app/rest-endpoints/settings/class-controller.php:482
+#: app/rest-endpoints/settings/class-controller.php:546
 msgid "Schedule days were not set"
 msgstr ""
 
-#: app/rest-endpoints/settings/class-controller.php:571
+#: app/rest-endpoints/settings/class-controller.php:635
 msgid "You cannot view settings."
 msgstr ""
 
-#: app/rest-endpoints/settings/class-controller.php:609
+#: app/rest-endpoints/settings/class-controller.php:673
 msgid "Action forbidden."
 msgstr ""
 
@@ -585,159 +589,159 @@ msgid "No user found for given input data."
 msgstr ""
 
 #. translators: %s Account detail URL.
-#: core/external/hub-connector/inc/class-admin.php:470
+#: core/external/hub-connector/inc/class-admin.php:476
 #, php-format
 msgid "You are currently using your Google account as your preferred login method. If you wish to login with your WPMU DEV email & password instead, please change the <strong>Login Method</strong> in <a href=\"%s\" target=\"_blank\">your WPMU DEV account</a>."
 msgstr ""
 
 #. translators: %s Account detail URL.
-#: core/external/hub-connector/inc/class-admin.php:480
+#: core/external/hub-connector/inc/class-admin.php:486
 #, php-format
 msgid "You are currently using your WPMU DEV email & password as your preferred login method. If you wish to login with your Google account instead, please change the <strong>Login Method</strong> in <a href=\"%s\" target=\"_blank\">your WPMU DEV account</a>."
 msgstr ""
 
 #. translators: %1$s Account detail URL, %2$s Reset URL.
-#: core/external/hub-connector/inc/class-admin.php:490
+#: core/external/hub-connector/inc/class-admin.php:496
 #, php-format
 msgid "Due to security improvements, you will need to re-link your Google account in the Hub. Please log in with your WPMU DEV email & password for now, then set up your preferred <strong>Login Method</strong> in <a href=\"%1$s\" target=\"_blank\">your WPMU DEV account</a>. Forgot your password? You can <a href=\"%2$s\" target=\"_blank\">reset it here</a>."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:502
+#: core/external/hub-connector/inc/class-admin.php:508
 msgid "Your login details were incorrect. Please make sure you're using your WPMU DEV email and password and try again."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:504
+#: core/external/hub-connector/inc/class-admin.php:510
 msgid "Forgot your password?"
 msgstr ""
 
 #. translators: %1$s Rest URL, %2$s Upgrade URL, %3$s Trial URL.
-#: core/external/hub-connector/inc/class-admin.php:515
+#: core/external/hub-connector/inc/class-admin.php:521
 #, php-format
 msgid "This domain has previously been registered with us by the user %1$s. To use WPMU DEV on this domain, you can either log in with the original account (you can <a target=\"_blank\" href=\"%2$s\">reset your password</a>) or <a target=\"_blank\" href=\"%3$s\">upgrade your trial</a> to a full membership. Trial accounts can't use previously registered domains - <a target=\"_blank\" href=\"%4$s\">here's why</a>."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:525
+#: core/external/hub-connector/inc/class-admin.php:531
 msgid "Contact support if you need further assistance &raquo;"
 msgstr ""
 
 #. translators: %1$d Account name, %2$s Security info, %3$s Hub URL, %4$s Support URL.
-#: core/external/hub-connector/inc/class-admin.php:531
+#: core/external/hub-connector/inc/class-admin.php:537
 #, php-format
 msgid "This site is currently registered to %1$s. For <a target=\"_blank\" href=\"%2$s\">security reasons</a> they will need to go to the <a target=\"_blank\" href=\"%3$s\">WPMU DEV Hub</a> and remove this domain before you can log in. If you do not have access to that account, and have no way of contacting that user, please <a target=\"_blank\" href=\"%4$s\">contact support for assistance</a>."
 msgstr ""
 
 #. translators: %s Support URL.
-#: core/external/hub-connector/inc/class-admin.php:544
+#: core/external/hub-connector/inc/class-admin.php:550
 #, php-format
 msgid "This domain cannot be registered to your WPMU DEV account.<br><a href=\"%s\">Contact Accounts & Billing if you need further assistance »</a>"
 msgstr ""
 
 #. translators: %1$s Hub Account URL, %2$s: Switch to Free URL.
-#: core/external/hub-connector/inc/class-admin.php:551
+#: core/external/hub-connector/inc/class-admin.php:557
 #: core/external/hub-connector/inc/class-api.php:618
 #, php-format
 msgid "Login failed — your WPMU DEV membership has expired. Renew now to regain full access, or switch to our free plan to continue managing all your site in the Hub.<br/><br/><a class=\"sui-button sui-button-blue\" href=\"%1$s\" target=\"_blank\">Renew Membership</a>&nbsp;<a class=\"sui-button sui-button-ghost\" href=\"%2$s\" target=\"_blank\">Switch to Free</a>"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:563
+#: core/external/hub-connector/inc/class-admin.php:569
 msgid "Google login failed. Please try again."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:567
+#: core/external/hub-connector/inc/class-admin.php:573
 msgid "Unknown error. Please update the WPMU DEV Dashboard plugin and try again."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:575
+#: core/external/hub-connector/inc/class-admin.php:581
 msgid "Your server had a problem connecting to WPMU DEV. Please try again."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:576
+#: core/external/hub-connector/inc/class-admin.php:582
 msgid "If this problem continues, please contact your host with this error message and ask:"
 msgstr ""
 
 #. translators: url to API.
-#: core/external/hub-connector/inc/class-admin.php:579
+#: core/external/hub-connector/inc/class-admin.php:585
 #, php-format
 msgid "\"Is PHP on my server properly configured to be able to contact %s with a POST HTTP request via fsockopen or CURL?\""
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:585
+#: core/external/hub-connector/inc/class-admin.php:591
 msgid "Your API Key was invalid. Please try again."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:669
+#: core/external/hub-connector/inc/class-admin.php:675
 msgid "Let’s connect your site"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:670
+#: core/external/hub-connector/inc/class-admin.php:676
 msgid "To manage your site from The Hub, log in with your WPMU DEV account email and password."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:671
+#: core/external/hub-connector/inc/class-admin.php:677
 msgid "Could not sync with The Hub. Please try again."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:672
+#: core/external/hub-connector/inc/class-admin.php:678
 msgid "The Hub connects WPMU DEV to your website and unlocks all the power of our all-in-one platform services."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:673
+#: core/external/hub-connector/inc/class-admin.php:679
 msgid "Once your website is connected to The Hub, you will be able to perform updates, manage services - all from one place."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:674
+#: core/external/hub-connector/inc/class-admin.php:680
 msgid "Please wait a few moments while we connect your website."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:675
+#: core/external/hub-connector/inc/class-admin.php:681
 msgid "Choose The Hub Team"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:676
+#: core/external/hub-connector/inc/class-admin.php:682
 msgid "We've noticed that you are a member of multiple teams in The Hub. Which team would you like to connect to this site?"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:677
+#: core/external/hub-connector/inc/class-admin.php:683
 msgid "Unknown API error occurred. Please try again."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:678
+#: core/external/hub-connector/inc/class-admin.php:684
 msgid "Create a free account to connect your site to WPMU DEV and activate cloud-based link checker. <i>It's fast, seamless, and free.</i>"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:679
+#: core/external/hub-connector/inc/class-admin.php:685
 msgid "You do not have the permission to view this page."
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:680
+#: core/external/hub-connector/inc/class-admin.php:686
 msgid "Sign in with Google"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:681
+#: core/external/hub-connector/inc/class-admin.php:687
 msgid "Forgot password?"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:682
+#: core/external/hub-connector/inc/class-admin.php:688
 msgid "Keep me logged in"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:683
+#: core/external/hub-connector/inc/class-admin.php:689
 msgid "Login"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:684
+#: core/external/hub-connector/inc/class-admin.php:690
 msgid "I am a new user"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:685
+#: core/external/hub-connector/inc/class-admin.php:691
 msgid "I am an existing user"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:686
+#: core/external/hub-connector/inc/class-admin.php:692
 msgid "OR continue with email"
 msgstr ""
 
-#: core/external/hub-connector/inc/class-admin.php:687
+#: core/external/hub-connector/inc/class-admin.php:693
 msgid "Create a free account"
 msgstr ""
 
@@ -1031,31 +1035,31 @@ msgstr ""
 
 #: legacy/core/core.php:633
 #: legacy/includes/admin/table-printer.php:330
-#: legacy/includes/admin/table-printer.php:748
+#: legacy/includes/admin/table-printer.php:754
 msgid "Edit URL"
 msgstr ""
 
 #: legacy/core/core.php:634
 #: legacy/includes/admin/links-page-js.php:716
 #: legacy/includes/admin/table-printer.php:335
-#: legacy/includes/admin/table-printer.php:751
+#: legacy/includes/admin/table-printer.php:757
 msgid "Unlink"
 msgstr ""
 
 #: legacy/core/core.php:635
 #: legacy/includes/admin/links-page-js.php:111
-#: legacy/includes/admin/table-printer.php:757
+#: legacy/includes/admin/table-printer.php:763
 msgid "Not broken"
 msgstr ""
 
 #: legacy/core/core.php:637
 #: legacy/includes/admin/table-printer.php:331
-#: legacy/includes/admin/table-printer.php:777
+#: legacy/includes/admin/table-printer.php:783
 msgid "Recheck"
 msgstr ""
 
 #: legacy/core/core.php:638
-#: legacy/includes/admin/table-printer.php:785
+#: legacy/includes/admin/table-printer.php:791
 msgctxt "link action; replace one redirect with a direct link"
 msgid "Fix redirect"
 msgstr ""
@@ -1999,7 +2003,7 @@ msgstr ""
 
 #: legacy/includes/admin/search-form.php:32
 #: legacy/includes/link-query.php:81
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/userSearchField.js:232
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/userSearchField.js:246
 msgid "Search"
 msgstr ""
 
@@ -2040,8 +2044,8 @@ msgstr ""
 
 #: legacy/includes/admin/search-form.php:113
 #: legacy/includes/admin/table-printer.php:413
-#: legacy/includes/admin/table-printer.php:819
-#: legacy/includes/admin/table-printer.php:944
+#: legacy/includes/admin/table-printer.php:825
+#: legacy/includes/admin/table-printer.php:950
 #: app/admin-modals/legacy/assets/js/components/backButton.js:14
 #: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/disconnectSiteModal.js:86
 msgid "Cancel"
@@ -2135,7 +2139,7 @@ msgid "Regular expression"
 msgstr ""
 
 #: legacy/includes/admin/table-printer.php:416
-#: legacy/includes/admin/table-printer.php:945
+#: legacy/includes/admin/table-printer.php:951
 msgid "Update"
 msgstr ""
 
@@ -2184,87 +2188,87 @@ msgstr ""
 msgid "Log"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:671
+#: legacy/includes/admin/table-printer.php:677
 #, php-format
 msgid "Select link %s"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:682
-#: legacy/includes/admin/table-printer.php:726
+#: legacy/includes/admin/table-printer.php:688
+#: legacy/includes/admin/table-printer.php:732
 msgid "Show more info about this link"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:700
+#: legacy/includes/admin/table-printer.php:706
 msgctxt "checked how long ago"
 msgid "Checked"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:715
+#: legacy/includes/admin/table-printer.php:721
 msgid "Broken for"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:727
+#: legacy/includes/admin/table-printer.php:733
 msgctxt "link in the \"Status\" column"
 msgid "Details"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:748
+#: legacy/includes/admin/table-printer.php:754
 msgid "Edit this link"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:750
+#: legacy/includes/admin/table-printer.php:756
 msgid "Remove this link from all posts"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:756
+#: legacy/includes/admin/table-printer.php:762
 msgid "Remove this link from the list of broken links and mark it as valid"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:764
+#: legacy/includes/admin/table-printer.php:770
 msgid "Hide this link and do not report it again unless its status changes"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:770
+#: legacy/includes/admin/table-printer.php:776
 msgid "Undismiss this link"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:771
+#: legacy/includes/admin/table-printer.php:777
 msgid "Undismiss"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:784
+#: legacy/includes/admin/table-printer.php:790
 msgid "Replace this redirect with a direct link"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:820
+#: legacy/includes/admin/table-printer.php:826
 msgid "Update URL"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:847
+#: legacy/includes/admin/table-printer.php:853
 msgid "[An orphaned link! This is a bug.]"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:924
+#: legacy/includes/admin/table-printer.php:930
 msgctxt "inline editor title"
 msgid "Edit Link"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:927
+#: legacy/includes/admin/table-printer.php:933
 msgctxt "inline link editor"
 msgid "Text"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:932
+#: legacy/includes/admin/table-printer.php:938
 msgctxt "inline link editor"
 msgid "URL"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:937
+#: legacy/includes/admin/table-printer.php:943
 msgctxt "inline link editor"
 msgid "Suggestions"
 msgstr ""
 
-#: legacy/includes/admin/table-printer.php:957
+#: legacy/includes/admin/table-printer.php:963
 msgid "Use this URL"
 msgstr ""
 
@@ -2277,108 +2281,108 @@ msgstr ""
 msgid "Edit"
 msgstr ""
 
-#: legacy/includes/any-post.php:569
-#: legacy/modules/containers/acf_field.php:252
-#: legacy/modules/containers/custom_field.php:258
+#: legacy/includes/any-post.php:575
+#: legacy/modules/containers/acf_field.php:258
+#: legacy/modules/containers/custom_field.php:264
 msgid "Move this item to the Trash"
 msgstr ""
 
 #. translators: %s: post title.
-#: legacy/includes/any-post.php:571
-#: legacy/modules/containers/acf_field.php:252
-#: legacy/modules/containers/custom_field.php:260
-#: legacy/modules/containers/custom_taxonomy/trait-blc-taxonomy-container-ui.php:83
+#: legacy/includes/any-post.php:577
+#: legacy/modules/containers/acf_field.php:258
+#: legacy/modules/containers/custom_field.php:266
+#: legacy/modules/containers/custom_taxonomy/trait-blc-taxonomy-container-ui.php:89
 msgid "Trash"
 msgstr ""
 
-#: legacy/includes/any-post.php:576
-#: legacy/modules/containers/acf_field.php:254
-#: legacy/modules/containers/custom_field.php:265
+#: legacy/includes/any-post.php:582
+#: legacy/modules/containers/acf_field.php:260
+#: legacy/modules/containers/custom_field.php:271
 msgid "Delete this item permanently"
 msgstr ""
 
-#: legacy/includes/any-post.php:578
-#: legacy/modules/containers/acf_field.php:254
+#: legacy/includes/any-post.php:584
+#: legacy/modules/containers/acf_field.php:260
 #: legacy/modules/containers/blogroll.php:47
-#: legacy/modules/containers/custom_field.php:267
+#: legacy/modules/containers/custom_field.php:273
 msgid "Delete"
 msgstr ""
 
-#: legacy/includes/any-post.php:591
+#: legacy/includes/any-post.php:597
 #, php-format
 msgid "Preview &#8220;%s&#8221;"
 msgstr ""
 
-#: legacy/includes/any-post.php:592
+#: legacy/includes/any-post.php:598
 msgid "Preview"
 msgstr ""
 
 #. translators: %s: post title.
-#: legacy/includes/any-post.php:599
-#: legacy/modules/containers/custom_taxonomy/trait-blc-taxonomy-container-ui.php:91
+#: legacy/includes/any-post.php:605
+#: legacy/modules/containers/custom_taxonomy/trait-blc-taxonomy-container-ui.php:97
 #, php-format
 msgid "View &#8220;%s&#8221;"
 msgstr ""
 
 #. translators: %s: post title.
-#: legacy/includes/any-post.php:600
-#: legacy/modules/containers/acf_field.php:258
+#: legacy/includes/any-post.php:606
+#: legacy/modules/containers/acf_field.php:264
 #: legacy/modules/containers/comment.php:172
-#: legacy/modules/containers/custom_field.php:272
-#: legacy/modules/containers/custom_taxonomy/trait-blc-taxonomy-container-ui.php:92
+#: legacy/modules/containers/custom_field.php:278
+#: legacy/modules/containers/custom_taxonomy/trait-blc-taxonomy-container-ui.php:98
 msgid "View"
 msgstr ""
 
-#: legacy/includes/any-post.php:620
+#: legacy/includes/any-post.php:626
 msgid "View this item"
 msgstr ""
 
-#: legacy/includes/any-post.php:627
+#: legacy/includes/any-post.php:633
 #: legacy/modules/containers/acf_field.php:248
 #: legacy/modules/containers/custom_field.php:252
 msgid "Edit this item"
 msgstr ""
 
-#: legacy/includes/any-post.php:707
+#: legacy/includes/any-post.php:713
 #: legacy/modules/containers/blogroll.php:83
 #: legacy/modules/containers/comment.php:43
 msgid "Nothing to update"
 msgstr ""
 
-#: legacy/includes/any-post.php:721
+#: legacy/includes/any-post.php:727
 #, php-format
 msgid "Updating post %d failed"
 msgstr ""
 
 #. translators: %1$s: post title, %2$d: post ID.
-#: legacy/includes/any-post.php:817
-#: legacy/modules/containers/acf_field.php:327
-#: legacy/modules/containers/custom_field.php:341
+#: legacy/includes/any-post.php:823
+#: legacy/modules/containers/acf_field.php:345
+#: legacy/modules/containers/custom_field.php:359
 #: legacy/modules/containers/custom_taxonomy/class-blc-taxonomy-container.php:236
 #, php-format
 msgid "Failed to delete post \"%1$s\" (%2$d)"
 msgstr ""
 
 #. translators: %1$s: post title, %2$d: post ID.
-#: legacy/includes/any-post.php:836
-#: legacy/modules/containers/acf_field.php:341
-#: legacy/modules/containers/custom_field.php:360
+#: legacy/includes/any-post.php:842
+#: legacy/modules/containers/acf_field.php:359
+#: legacy/modules/containers/custom_field.php:378
 #: legacy/modules/containers/custom_taxonomy/class-blc-taxonomy-container.php:254
 #, php-format
 msgid "Can't move post \"%1$s\" (%2$d) to the trash because the trash feature is disabled"
 msgstr ""
 
 #. translators: %1$s: post title, %2$d: post ID.
-#: legacy/includes/any-post.php:856
-#: legacy/modules/containers/acf_field.php:353
-#: legacy/modules/containers/custom_field.php:379
+#: legacy/includes/any-post.php:862
+#: legacy/modules/containers/acf_field.php:371
+#: legacy/modules/containers/custom_field.php:397
 #: legacy/modules/containers/custom_taxonomy/class-blc-taxonomy-container.php:274
 #, php-format
 msgid "Failed to move post \"%1$s\" (%2$d) to the trash"
 msgstr ""
 
 #. translators: %d is the number of deleted posts.
-#: legacy/includes/any-post.php:991
+#: legacy/includes/any-post.php:997
 #, php-format
 msgid "%d post deleted."
 msgid_plural "%d posts deleted."
@@ -2386,7 +2390,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %d is the number of deleted pages.
-#: legacy/includes/any-post.php:994
+#: legacy/includes/any-post.php:1000
 #, php-format
 msgid "%d page deleted."
 msgid_plural "%d pages deleted."
@@ -2394,7 +2398,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %1$d is the number of deleted items, %2$s is the item type.
-#: legacy/includes/any-post.php:997
+#: legacy/includes/any-post.php:1003
 #, php-format
 msgid "%1$d \"%2$s\" deleted."
 msgid_plural "%1$d \"%2$s\" deleted."
@@ -2402,7 +2406,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %d is the number of posts moved to the Trash.
-#: legacy/includes/any-post.php:1015
+#: legacy/includes/any-post.php:1021
 #, php-format
 msgid "%d post moved to the Trash."
 msgid_plural "%d posts moved to the Trash."
@@ -2410,7 +2414,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %d is the number of pages moved to the Trash.
-#: legacy/includes/any-post.php:1018
+#: legacy/includes/any-post.php:1024
 #, php-format
 msgid "%d page moved to the Trash."
 msgid_plural "%d pages moved to the Trash."
@@ -2418,7 +2422,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %1$d is the number of trashed items, %2$s is the item type.
-#: legacy/includes/any-post.php:1021
+#: legacy/includes/any-post.php:1027
 #, php-format
 msgid "%1$d \"%2$s\" moved to the Trash."
 msgid_plural "%1$d \"%2$s\" moved to the Trash."
@@ -2432,8 +2436,8 @@ msgid_plural "%1$d '%2$s' have been deleted"
 msgstr[0] ""
 msgstr[1] ""
 
-#: legacy/includes/containers.php:936
 #: legacy/includes/containers.php:954
+#: legacy/includes/containers.php:972
 #, php-format
 msgid "Container type '%s' not recognized"
 msgstr ""
@@ -2833,8 +2837,8 @@ msgstr ""
 msgid "Edit this post"
 msgstr ""
 
-#: legacy/modules/containers/acf_field.php:258
-#: legacy/modules/containers/custom_field.php:272
+#: legacy/modules/containers/acf_field.php:264
+#: legacy/modules/containers/custom_field.php:278
 #, php-format
 msgid "View \"%s\""
 msgstr ""
@@ -2928,7 +2932,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %s: post title.
-#: legacy/modules/containers/custom_taxonomy/trait-blc-taxonomy-container-ui.php:82
+#: legacy/modules/containers/custom_taxonomy/trait-blc-taxonomy-container-ui.php:88
 #, php-format
 msgid "Move &#8220;%s&#8221; to the Trash"
 msgstr ""
@@ -3309,16 +3313,26 @@ msgstr ""
 msgid "Clear all filters"
 msgstr ""
 
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/schduleTabUsers.js:177
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/schduleTabUsers.js:102
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/userSearchField.js:126
+msgid "The email address of this user has already been added as a recipient."
+msgstr ""
+
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/schduleTabUsers.js:103
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/userSearchField.js:127
+msgid "This user is already a recipient."
+msgstr ""
+
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/schduleTabUsers.js:195
 msgid "Search Users"
 msgstr ""
 
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/schduleTabUsers.js:186
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:303
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/schduleTabUsers.js:211
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:341
 msgid "Added Recipients"
 msgstr ""
 
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/schduleTabUsers.js:205
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/schduleTabUsers.js:230
 msgid "Users"
 msgstr ""
 
@@ -3342,39 +3356,43 @@ msgstr ""
 msgid "Add recipients to be notified of scheduled broken link check reports."
 msgstr ""
 
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:243
-msgid "Invite recipients by email address, and they will receive scheduled broken link check reports."
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:170
+msgid "This email address belongs to a user who is already a recipient."
 msgstr ""
 
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:248
-msgid "Invite Recipients"
-msgstr ""
-
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:254
-msgid "Name"
-msgstr ""
-
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:255
-msgid "E.g. John"
-msgstr ""
-
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:266
-msgid "Email Address"
-msgstr ""
-
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:267
-msgid "E.g. John@doe.com"
-msgstr ""
-
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:276
-msgid "The email address you entered is invalid."
-msgstr ""
-
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:282
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:171
 msgid "The email address is already in use."
 msgstr ""
 
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:289
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:281
+msgid "Invite recipients by email address, and they will receive scheduled broken link check reports."
+msgstr ""
+
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:286
+msgid "Invite Recipients"
+msgstr ""
+
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:292
+msgid "Name"
+msgstr ""
+
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:293
+msgid "E.g. John"
+msgstr ""
+
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:304
+msgid "Email Address"
+msgstr ""
+
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:305
+msgid "E.g. John@doe.com"
+msgstr ""
+
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:314
+msgid "The email address you entered is invalid."
+msgstr ""
+
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/scheduleTabUsersEmail.js:327
 msgid "Add Recipient"
 msgstr ""
 
@@ -3395,18 +3413,18 @@ msgid "No user found for <strong>%s</strong> term."
 msgstr ""
 
 #. translators: %d: Minimum letter number in order to start remote search
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/userSearchField.js:70
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/userSearchField.js:72
 #, js-format
 msgid "Nothing found for term %s."
 msgstr ""
 
 #. translators: %d: Minimum letter number in order to start remote search
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/userSearchField.js:161
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/userSearchField.js:179
 #, js-format
 msgid "Please enter %d or more characters."
 msgstr ""
 
-#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/userSearchField.js:231
+#: app/admin-pages/cloud-page/assets/js/layouts/dashboard/components/scheduleModuleParts/userSearchField.js:245
 msgid "Type username"
 msgstr ""
 
