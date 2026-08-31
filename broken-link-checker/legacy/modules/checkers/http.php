@@ -144,6 +144,205 @@ class blcHttpCheckerBase extends blcChecker {
 		);
 	}
 
+	/**
+	 * IP ranges a link check must never be allowed to reach.
+	 *
+	 * wp_http_validate_url() performs a similar check, but the set of ranges it
+	 * covers has grown over time: the IANA special-purpose ranges (link-local,
+	 * CGNAT, TEST-NET, multicast, reserved) were added to WordPress core
+	 * comparatively recently, while this plugin still supports considerably
+	 * older versions. Delegating the whole boundary to core would therefore
+	 * leave cloud metadata endpoints such as 169.254.169.254 reachable on the
+	 * older versions we support, so the ranges are restated here and enforced
+	 * by the plugin regardless of which core version happens to be running.
+	 *
+	 * @var string[]
+	 */
+	const BLOCKED_IP_RANGES = array(
+		// IPv4.
+		'0.0.0.0/8',        // "This network".
+		'10.0.0.0/8',       // Private.
+		'100.64.0.0/10',    // Carrier-grade NAT.
+		'127.0.0.0/8',      // Loopback.
+		'169.254.0.0/16',   // Link-local, includes the cloud metadata endpoints.
+		'172.16.0.0/12',    // Private.
+		'192.0.0.0/24',     // IETF protocol assignments.
+		'192.0.2.0/24',     // TEST-NET-1.
+		'192.88.99.0/24',   // 6to4 relay anycast.
+		'192.168.0.0/16',   // Private.
+		'198.18.0.0/15',    // Benchmarking.
+		'198.51.100.0/24',  // TEST-NET-2.
+		'203.0.113.0/24',   // TEST-NET-3.
+		'224.0.0.0/4',      // Multicast.
+		'240.0.0.0/4',      // Reserved, includes the 255.255.255.255 broadcast address.
+
+		// IPv6.
+		'::/128',           // Unspecified.
+		'::1/128',          // Loopback.
+		'::ffff:0:0/96',    // IPv4-mapped.
+		'64:ff9b::/96',     // IPv4/IPv6 translation.
+		'100::/64',         // Discard-only.
+		'2001:db8::/32',    // Documentation.
+		'fc00::/7',         // Unique local.
+		'fe80::/10',        // Link-local.
+		'ff00::/8',         // Multicast.
+	);
+
+	/**
+	 * Determine whether an IP address falls inside a CIDR range.
+	 *
+	 * Compares the packed representations so that both address families are
+	 * handled without the caller having to know which one it is looking at.
+	 *
+	 * @param string $ip   IP address in presentation format.
+	 * @param string $cidr Range in CIDR notation.
+	 * @return bool
+	 */
+	protected function ip_in_cidr( $ip, $cidr ) {
+		if ( false === strpos( $cidr, '/' ) ) {
+			return false;
+		}
+
+		list( $subnet, $prefix ) = explode( '/', $cidr, 2 );
+
+		$packed_ip     = @inet_pton( $ip );
+		$packed_subnet = @inet_pton( $subnet );
+
+		// Differing lengths mean the two belong to different address families.
+		if ( false === $packed_ip || false === $packed_subnet || strlen( $packed_ip ) !== strlen( $packed_subnet ) ) {
+			return false;
+		}
+
+		$prefix = (int) $prefix;
+		if ( $prefix < 0 || $prefix > strlen( $packed_ip ) * 8 ) {
+			return false;
+		}
+
+		$whole_bytes    = intdiv( $prefix, 8 );
+		$remaining_bits = $prefix % 8;
+
+		if ( $whole_bytes > 0 && 0 !== strncmp( $packed_ip, $packed_subnet, $whole_bytes ) ) {
+			return false;
+		}
+
+		if ( 0 === $remaining_bits ) {
+			return true;
+		}
+
+		$mask = chr( ( 0xFF << ( 8 - $remaining_bits ) ) & 0xFF );
+
+		return ( $packed_ip[ $whole_bytes ] & $mask ) === ( $packed_subnet[ $whole_bytes ] & $mask );
+	}
+
+	/**
+	 * Determine whether an IP address is one the plugin must not connect to.
+	 *
+	 * @param string $ip IP address in presentation format.
+	 * @return bool
+	 */
+	public function is_blocked_ip( $ip ) {
+		// Anything that will not parse as an address is not something we can vouch for.
+		if ( ! filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+			return true;
+		}
+
+		foreach ( self::BLOCKED_IP_RANGES as $range ) {
+			if ( $this->ip_in_cidr( $ip, $range ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Resolve a host name to every address it currently answers with.
+	 *
+	 * Both address families are looked up. wp_http_validate_url() consults only
+	 * gethostbyname(), which is IPv4-only, so a host answering with an innocuous
+	 * A record and a loopback AAAA record would otherwise pass validation and
+	 * then be reached over IPv6.
+	 *
+	 * @param string $host Host name, or an IP address literal.
+	 * @return string[] Addresses in presentation format, empty when the host does not resolve.
+	 */
+	protected function resolve_host( $host ) {
+		if ( filter_var( $host, FILTER_VALIDATE_IP ) ) {
+			return array( $host );
+		}
+
+		$addresses = array();
+
+		$records = @dns_get_record( $host, DNS_A | DNS_AAAA );
+		if ( is_array( $records ) ) {
+			foreach ( $records as $record ) {
+				if ( ! empty( $record['ip'] ) ) {
+					$addresses[] = $record['ip'];
+				} elseif ( ! empty( $record['ipv6'] ) ) {
+					$addresses[] = $record['ipv6'];
+				}
+			}
+		}
+
+		// dns_get_record() is neither available nor useful on every host, so fall
+		// back to the same lookup core performs.
+		if ( empty( $addresses ) ) {
+			$resolved = @gethostbyname( $host );
+			if ( ! empty( $resolved ) && $resolved !== $host ) {
+				$addresses[] = $resolved;
+			}
+		}
+
+		return $addresses;
+	}
+
+	/**
+	 * Determine whether the plugin is allowed to request a URL.
+	 *
+	 * This has to be applied to every URL the checker is about to request,
+	 * each redirect target included, and not only to the URL a check started
+	 * with.
+	 *
+	 * @param string $url URL to test.
+	 * @return bool
+	 */
+	public function is_safe_url( $url ) {
+		if ( ! wp_http_validate_url( $url ) ) {
+			return false;
+		}
+
+		$host = @parse_url( $url, PHP_URL_HOST );
+		if ( empty( $host ) ) {
+			return false;
+		}
+
+		$host = trim( $host, '.' );
+
+		// Links pointing back at the site itself are legitimate even when the site
+		// is served from a private address, which is the case on a great many
+		// intranet and staging installs. Core makes the same exemption, and the
+		// port allow-list still applies to these URLs.
+		$home = @parse_url( get_option( 'home' ), PHP_URL_HOST );
+		if ( ! empty( $home ) && strtolower( $home ) === strtolower( $host ) ) {
+			return true;
+		}
+
+		$addresses = $this->resolve_host( $host );
+
+		// A host we cannot resolve is a host we cannot clear.
+		if ( empty( $addresses ) ) {
+			return false;
+		}
+
+		foreach ( $addresses as $address ) {
+			if ( $this->is_blocked_ip( $address ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 }
 
 class blcCurlHttp extends blcHttpCheckerBase {
@@ -156,14 +355,22 @@ class blcCurlHttp extends blcHttpCheckerBase {
 
 		$log                = '';
 		$this->last_headers = '';
-		$url                = wp_http_validate_url( $url );
 		$result             = array(
 			'broken'  => false,
 			'timeout' => false,
 			'warning' => false,
 		);
 
-		if ( empty( $url ) ) {
+		/*
+		 * Normalise first and validate afterwards, so the string that gets checked
+		 * is the string that ultimately gets requested. clean_url() runs
+		 * html_entity_decode(), so validating ahead of it would leave the two free
+		 * to disagree about where the URL actually points.
+		 */
+		$url = wp_kses_bad_protocol( $this->clean_url( $url ), array( 'http', 'https', 'ssl' ) );
+		$url = wp_http_validate_url( $url );
+
+		if ( empty( $url ) || ! $this->is_safe_url( $url ) ) {
 			$blclog->error( __CLASS__ . ' Invalid URL:', $url );
 
 			$result = array(
@@ -177,120 +384,119 @@ class blcCurlHttp extends blcHttpCheckerBase {
 			return $result;
 		}
 
-		$url = wp_kses_bad_protocol( $this->clean_url( $url ), array( 'http', 'https', 'ssl' ) );
-
 		$blclog->debug( __CLASS__ . ' Clean URL:', $url );
 
 		// Get the BLC configuration. It's used below to set the right timeout values and such.
 		$conf = blc_get_configuration();
 
-		// Init curl.
-		$ch              = curl_init();
-		$request_headers = array();
-		curl_setopt( $ch, CURLOPT_URL, $this->urlencodefix( $url ) );
-		curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
-
-		// Masquerade as a recent version of Chrome
-		//$ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.34 Safari/537.36';
-		// Use a custom user agent string.
-		$ua = apply_filters( 'wpmudev_blc_local_ua', 'WPMU DEV Broken Link Checker Local Engine', $url, $use_get );
-		curl_setopt( $ch, CURLOPT_USERAGENT, $ua );
-
-		// Close the connection after the request (disables keep-alive). The plugin rate-limits requests,
-		// so it's likely we'd overrun the keep-alive timeout anyway.
-		curl_setopt( $ch, CURLOPT_FORBID_REUSE, true );
-		$request_headers[] = 'Connection: close';
-
-		// Add a semi-plausible referer header to avoid tripping up some bot traps
-		curl_setopt( $ch, CURLOPT_REFERER, home_url() );
-
-		/*
-		 * Redirects don't work when open_basedir is enabled.
-		 * https://www.php.net/manual/en/curl.constants.php#constant.curlopt-followlocation
-		 */
-		if ( ! blcUtility::is_open_basedir() ) {
-			curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, true );
-		} else {
-			$log .= "[Warning] Could't follow the redirect URL (if any) because open base dir enabled\n";
-		}
-
-		// Set maximum redirects
-		curl_setopt( $ch, CURLOPT_MAXREDIRS, 10 );
-
-		// Set the timeout
-		curl_setopt( $ch, CURLOPT_TIMEOUT, $conf->options['timeout'] );
-		curl_setopt( $ch, CURLOPT_CONNECTTIMEOUT, $conf->options['timeout'] );
-
-		// Set the proxy configuration. The user can provide this in wp-config.php
-		if ( defined( 'WP_PROXY_HOST' ) ) {
-			curl_setopt( $ch, CURLOPT_PROXY, WP_PROXY_HOST );
-		}
-		if ( defined( 'WP_PROXY_PORT' ) ) {
-			curl_setopt( $ch, CURLOPT_PROXYPORT, WP_PROXY_PORT );
-		}
-		if ( defined( 'WP_PROXY_USERNAME' ) ) {
-			$auth = WP_PROXY_USERNAME;
-			if ( defined( 'WP_PROXY_PASSWORD' ) ) {
-				$auth .= ':' . WP_PROXY_PASSWORD;
-			}
-			curl_setopt( $ch, CURLOPT_PROXYUSERPWD, $auth );
-		}
-
-		// Make CURL return a valid result even if it gets a 404 or other error.
-		curl_setopt( $ch, CURLOPT_FAILONERROR, false );
-
 		$nobody = ! $use_get; // Whether to send a HEAD request (the default) or a GET request
 
-		$parts = @parse_url( $url );
-		if ( ! empty( $parts['scheme'] ) && 'https' === $parts['scheme'] ) {
-			curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false ); // Required to make HTTPS URLs work.
-			curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
-			// $nobody = false; //Can't use HEAD with HTTPS.
+		/*
+		 * Walk the redirect chain here rather than handing it to cURL, so that every
+		 * hop can be validated before it is requested. CURLOPT_FOLLOWLOCATION was
+		 * used previously, which meant only the URL the check started with was ever
+		 * validated: a Location header pointing at a loopback, private or link-local
+		 * address was followed without question.
+		 *
+		 * Driving the chain ourselves also means redirects are now followed on hosts
+		 * with open_basedir enabled, where cURL refuses to follow them at all.
+		 */
+		$max_redirects  = 10;
+		$redirect_count = 0;
+		$request_url    = $url;
+		$final_url      = $url;
+		$blocked_url    = '';
+
+		// Durations are accumulated across every hop, because cURL used to report
+		// the time for the whole chain and the timeout heuristic below is tuned
+		// against that.
+		$total_duration          = 0;
+		$total_measured_duration = 0;
+
+		while ( true ) {
+			$response  = $this->perform_request( $request_url, $nobody, $conf, $use_get );
+			$final_url = $request_url;
+			$http_code = intval( $response['info']['http_code'] );
+
+			$total_duration          += empty( $response['info']['total_time'] ) ? 0 : $response['info']['total_time'];
+			$total_measured_duration += $response['measured_duration'];
+
+			// Anything that is not a redirect is the end of the chain.
+			if ( $http_code < 300 || $http_code >= 400 ) {
+				break;
+			}
+
+			// With redirect following disabled, cURL resolves the target for us.
+			$next_url = empty( $response['info']['redirect_url'] ) ? '' : $response['info']['redirect_url'];
+			if ( '' === $next_url ) {
+				break;
+			}
+
+			if ( $redirect_count >= $max_redirects ) {
+				$log .= sprintf( "[Warning] Stopped following redirects after %d hops.\n", $max_redirects );
+				break;
+			}
+
+			if ( ! $this->is_safe_url( $next_url ) ) {
+				$blocked_url = $next_url;
+				break;
+			}
+
+			$request_url = $next_url;
+			++$redirect_count;
 		}
 
-		if ( $nobody ) {
-			// If possible, use HEAD requests for speed.
-			curl_setopt( $ch, CURLOPT_NOBODY, true );
-		} else {
-			// If we must use GET at least limit the amount of downloaded data.
-			$request_headers[] = 'Range: bytes=0-2048'; // 2 KB
-		}
+		$content                   = $response['content'];
+		$info                      = $response['info'];
+		$measured_request_duration = $total_measured_duration;
 
-		// Set request headers.
-		if ( ! empty( $request_headers ) ) {
-			curl_setopt( $ch, CURLOPT_HTTPHEADER, $request_headers );
-		}
-
-		// Register a callback function which will process the HTTP header(s).
-		// It can be called multiple times if the remote server performs a redirect.
-		curl_setopt( $ch, CURLOPT_HEADERFUNCTION, array( $this, 'read_header' ) );
-
-		// Record request headers.
-		if ( defined( 'CURLINFO_HEADER_OUT' ) ) {
-			curl_setopt( $ch, CURLINFO_HEADER_OUT, true );
-		}
-
-		if (  apply_filters( 'wpmudev_blc_local_accept_encoding_header', true ) ) {
-			curl_setopt( $ch, CURLOPT_ENCODING, '' );
-		}
-
-		// Apply filter for additional options
-		curl_setopt_array( $ch, apply_filters( 'broken-link-checker-curl-options', array() ) );
-
-		// Execute the request
-		$start_time                = microtime_float();
-		$content                   = curl_exec( $ch );
-		$measured_request_duration = microtime_float() - $start_time;
-		$blclog->debug( sprintf( 'HTTP request took %.3f seconds', $measured_request_duration ) );
-
-		$info = curl_getinfo( $ch );
-
-		// var_dump( $info ); die();
 		// Store the results
 		$result['http_code']        = intval( $info['http_code'] );
-		$result['final_url']        = $info['url'];
-		$result['request_duration'] = $info['total_time'];
-		$result['redirect_count']   = $info['redirect_count'];
+		$result['final_url']        = $final_url;
+		$result['request_duration'] = $total_duration;
+		$result['redirect_count']   = $redirect_count;
+
+		/*
+		 * The chain ended at a target we are not allowed to request. Report the link
+		 * as unverified instead of following it, and deliberately do not expose the
+		 * blocked target: a non-zero redirect_count paired with a final_url is what
+		 * the "Fix redirect" action rewrites post content to, and we have not
+		 * established where this chain actually ends. Only the host is logged, and
+		 * it is escaped at write time like the rest of the log.
+		 */
+		if ( '' !== $blocked_url ) {
+			$blocked_host = @parse_url( $blocked_url, PHP_URL_HOST );
+
+			$result['final_url']      = $url;
+			$result['redirect_count'] = 0;
+			$result['broken']         = false;
+			$result['warning']        = true;
+			$result['status_code']    = BLC_LINK_STATUS_WARNING;
+			$result['status_text']    = __( 'Unsafe Redirect', 'broken-link-checker' );
+			$result['error_code']     = 'unsafe_redirect';
+
+			$log .= sprintf(
+				/* translators: %s: host name of the redirect target that was refused. */
+				__( 'Refused to follow a redirect to "%s" because it resolves to a private, loopback or otherwise reserved address.', 'broken-link-checker' ),
+				esc_html( (string) $blocked_host )
+			) . "\n";
+
+			$blclog->error( __CLASS__ . ' Refused an unsafe redirect for:', $url );
+
+			$result['log'] = $log;
+
+			$result['result_hash'] = implode(
+				'|',
+				array(
+					$result['http_code'],
+					'0',
+					'0',
+					blcLink::remove_query_string( $result['final_url'] ),
+				)
+			);
+
+			return $result;
+		}
 
 		// CURL doesn't return a request duration when a timeout happens, so we measure it ourselves.
 		// It is useful to see how long the plugin waited for the server to respond before assuming it timed out.
@@ -317,8 +523,8 @@ class blcCurlHttp extends blcHttpCheckerBase {
 		if ( 0 === absint( $final_http_code ) ) {
 			$result['broken'] = true;
 
-			$error_code = curl_errno( $ch );
-			$log       .= sprintf( "%s [Error #%d]\n", curl_error( $ch ), $error_code );
+			$error_code = $response['errno'];
+			$log       .= sprintf( "%s [Error #%d]\n", $response['error'], $error_code );
 
 			// We only handle a couple of CURL error codes; most are highly esoteric.
 			// libcurl "CURLE_" constants can't be used here because some of them have
@@ -359,11 +565,6 @@ class blcCurlHttp extends blcHttpCheckerBase {
 			$result['broken'] = $this->is_error_code( $final_http_code );
 		}
 
-		// Apply filter before curl closes
-		apply_filters( 'broken-link-checker-curl-before-close', $ch, $content, $this->last_headers );
-
-		curl_close( $ch );
-
 		$blclog->info(
 			sprintf(
 				'HTTP response: %d, duration: %.2f seconds, status text: "%s"',
@@ -385,10 +586,8 @@ class blcCurlHttp extends blcHttpCheckerBase {
 			// another, even more general, error code instead. So just checking for 405 wouldn't be enough.
 		}
 
-		// When safe_mode or open_basedir is enabled CURL will be forbidden from following redirects,
-		// so redirect_count will be 0 for all URLs. As a workaround, set it to 1 when the HTTP
-		// response codes indicates a redirect but redirect_count is zero.
-		// Note to self : Extracting the Location header might also be helpful.
+		// A redirect we did not follow - one with no usable Location header, or one
+		// that hit the hop limit - still reads as a redirect in the Status column.
 		if ( ( 0 === absint( $result['redirect_count'] ) ) && ( in_array( $result['http_code'], array( 301, 302, 303, 307 ) ) ) ) {
 			$result['redirect_count'] = 1;
 		}
@@ -434,6 +633,159 @@ class blcCurlHttp extends blcHttpCheckerBase {
 		);
 
 		return $result;
+	}
+
+	/**
+	 * Pin the transport options that must not be negotiable.
+	 *
+	 * These are applied after the 'broken-link-checker-curl-options' filter on
+	 * purpose. That filter is public, and anything switching redirect following
+	 * back on through it would hand the redirect chain to cURL again and quietly
+	 * undo the per-hop validation check() performs.
+	 *
+	 * @param resource|\CurlHandle $ch cURL handle.
+	 */
+	protected function apply_transport_restrictions( $ch ) {
+		// check() walks the redirect chain itself, clearing every hop before it is
+		// requested. cURL must never follow one on its own.
+		curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, false );
+		curl_setopt( $ch, CURLOPT_MAXREDIRS, 0 );
+
+		/*
+		 * Hold the transport to the two schemes this checker claims to handle.
+		 * CURLOPT_PROTOCOLS is deprecated in newer libcurl builds in favour of the
+		 * string form, so use whichever one the running version provides.
+		 */
+		if ( defined( 'CURLOPT_PROTOCOLS_STR' ) ) {
+			curl_setopt( $ch, CURLOPT_PROTOCOLS_STR, 'http,https' );
+		} elseif ( defined( 'CURLPROTO_HTTP' ) && defined( 'CURLPROTO_HTTPS' ) ) {
+			curl_setopt( $ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS );
+		}
+	}
+
+	/**
+	 * Perform a single HTTP request, without following redirects.
+	 *
+	 * Redirect following is deliberately left off. check() drives the redirect
+	 * chain itself so every hop can be validated before it is requested, which
+	 * is what stops an attacker-supplied Location header from reaching hosts the
+	 * plugin is not allowed to talk to.
+	 *
+	 * @param string $url     URL to request. Must already have been cleared by is_safe_url().
+	 * @param bool   $nobody  Whether to send a HEAD request rather than a GET.
+	 * @param object $conf    Plugin configuration.
+	 * @param bool   $use_get Whether this is the GET retry. Passed to the user agent filter.
+	 * @return array {
+	 *     @type string|false $content           Response body, or false when the request failed.
+	 *     @type array        $info              curl_getinfo() output.
+	 *     @type int          $errno             cURL error number.
+	 *     @type string       $error             cURL error message.
+	 *     @type float        $measured_duration Wall-clock duration of the request.
+	 * }
+	 */
+	protected function perform_request( $url, $nobody, $conf, $use_get ) {
+		// Init curl.
+		$ch              = curl_init();
+		$request_headers = array();
+		curl_setopt( $ch, CURLOPT_URL, $this->urlencodefix( $url ) );
+		curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+
+		// Masquerade as a recent version of Chrome
+		//$ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.34 Safari/537.36';
+		// Use a custom user agent string.
+		$ua = apply_filters( 'wpmudev_blc_local_ua', 'WPMU DEV Broken Link Checker Local Engine', $url, $use_get );
+		curl_setopt( $ch, CURLOPT_USERAGENT, $ua );
+
+		// Close the connection after the request (disables keep-alive). The plugin rate-limits requests,
+		// so it's likely we'd overrun the keep-alive timeout anyway.
+		curl_setopt( $ch, CURLOPT_FORBID_REUSE, true );
+		$request_headers[] = 'Connection: close';
+
+		// Add a semi-plausible referer header to avoid tripping up some bot traps
+		curl_setopt( $ch, CURLOPT_REFERER, home_url() );
+
+		// Set the timeout
+		curl_setopt( $ch, CURLOPT_TIMEOUT, $conf->options['timeout'] );
+		curl_setopt( $ch, CURLOPT_CONNECTTIMEOUT, $conf->options['timeout'] );
+
+		// Set the proxy configuration. The user can provide this in wp-config.php
+		if ( defined( 'WP_PROXY_HOST' ) ) {
+			curl_setopt( $ch, CURLOPT_PROXY, WP_PROXY_HOST );
+		}
+		if ( defined( 'WP_PROXY_PORT' ) ) {
+			curl_setopt( $ch, CURLOPT_PROXYPORT, WP_PROXY_PORT );
+		}
+		if ( defined( 'WP_PROXY_USERNAME' ) ) {
+			$auth = WP_PROXY_USERNAME;
+			if ( defined( 'WP_PROXY_PASSWORD' ) ) {
+				$auth .= ':' . WP_PROXY_PASSWORD;
+			}
+			curl_setopt( $ch, CURLOPT_PROXYUSERPWD, $auth );
+		}
+
+		// Make CURL return a valid result even if it gets a 404 or other error.
+		curl_setopt( $ch, CURLOPT_FAILONERROR, false );
+
+		$parts = @parse_url( $url );
+		if ( ! empty( $parts['scheme'] ) && 'https' === $parts['scheme'] ) {
+			curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false ); // Required to make HTTPS URLs work.
+			curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+		}
+
+		if ( $nobody ) {
+			// If possible, use HEAD requests for speed.
+			curl_setopt( $ch, CURLOPT_NOBODY, true );
+		} else {
+			// If we must use GET at least limit the amount of downloaded data.
+			$request_headers[] = 'Range: bytes=0-2048'; // 2 KB
+		}
+
+		// Set request headers.
+		if ( ! empty( $request_headers ) ) {
+			curl_setopt( $ch, CURLOPT_HTTPHEADER, $request_headers );
+		}
+
+		// Register a callback function which will process the HTTP header(s).
+		curl_setopt( $ch, CURLOPT_HEADERFUNCTION, array( $this, 'read_header' ) );
+
+		// Record request headers.
+		if ( defined( 'CURLINFO_HEADER_OUT' ) ) {
+			curl_setopt( $ch, CURLINFO_HEADER_OUT, true );
+		}
+
+		if (  apply_filters( 'wpmudev_blc_local_accept_encoding_header', true ) ) {
+			curl_setopt( $ch, CURLOPT_ENCODING, '' );
+		}
+
+		// Apply filter for additional options
+		curl_setopt_array( $ch, apply_filters( 'broken-link-checker-curl-options', array() ) );
+
+		// Applied last, after the public filter above, so the boundary cannot be
+		// negotiated away by third-party code.
+		$this->apply_transport_restrictions( $ch );
+
+		// Execute the request
+		$start_time                = microtime_float();
+		$content                   = curl_exec( $ch );
+		$measured_request_duration = microtime_float() - $start_time;
+
+		$info  = curl_getinfo( $ch );
+		$errno = curl_errno( $ch );
+		$error = curl_error( $ch );
+
+		// Apply filter before curl closes. This now runs once per hop rather than
+		// once per check, because each hop is a request in its own right.
+		apply_filters( 'broken-link-checker-curl-before-close', $ch, $content, $this->last_headers );
+
+		curl_close( $ch );
+
+		return array(
+			'content'           => $content,
+			'info'              => $info,
+			'errno'             => $errno,
+			'error'             => $error,
+			'measured_duration' => $measured_request_duration,
+		);
 	}
 
 	function read_header( /** @noinspection PhpUnusedParameterInspection */ $ch, $header ) {

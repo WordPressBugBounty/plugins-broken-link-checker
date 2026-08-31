@@ -3,7 +3,7 @@ Contributors: managewp, wpmudev
 Tags: links, broken links, internal link, external link, broken images
 Requires at least: 5.2
 Tested up to: 7.1
-Stable tag: 2.4.14
+Stable tag: 2.4.14.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -207,6 +207,9 @@ We take plugin security incredibly seriously; if you have a bug or vulnerability
 6. Local Broken Link Checker engine settings
 
 == Changelog ==
+
+= 2.4.14.1 =
+* Fix: A server-side request vulnerability
 
 = 2.4.14 =
 * Fix: Fixed scheduled scans running more than once and duplicate scan report emails being sent when the site uses a 12-hour time format.
