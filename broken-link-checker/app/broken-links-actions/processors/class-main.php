@@ -270,10 +270,20 @@ class Main extends Base {
 				$new_link = $link->get_new_link();
 
 				foreach ( $metas as $meta ) {
-					$new_content = $processor->execute( $meta->content, $old_link, $new_link );
+					// The query returns the raw stored value. Decode it the way get_post_meta() would,
+					// so the processor never edits serialized text directly: doing so leaves stale
+					// string lengths behind, and the value can no longer be decoded.
+					$content = $this->decode_meta_value( $meta->content );
+
+					if ( is_wp_error( $content ) ) {
+						// Undecodable, or holds objects. Leave the stored value untouched.
+						continue;
+					}
+
+					$new_content = $this->execute_in_meta_value( $content, $processor, $old_link, $new_link );
 					$new_content = apply_filters( 'wpmudev_blc_link_action_post_meta_content', $new_content, $post_id, $meta->meta_key, $this->link );
 
-					if ( $new_content !== $meta->content ) {
+					if ( $new_content !== $content ) {
 						return update_post_meta( $post_id, sanitize_key( $meta->meta_key ), $new_content );
 					}
 				}
@@ -304,6 +314,94 @@ class Main extends Base {
 				if ( $new_content !== $content ) {
 					return update_post_meta( $post_id, sanitize_key( $meta_key ), $new_content );
 				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Decodes a raw post meta value as stored in the database.
+	 *
+	 * Mirrors what get_post_meta() returns, except that object creation is switched off.
+	 * Meta values are editable from the post's Custom Fields box, so they must never be
+	 * turned into live objects here.
+	 *
+	 * @param string $raw The raw `meta_value` column.
+	 * @return mixed|\WP_Error The decoded value, or a WP_Error when the value cannot be
+	 *                         decoded or contains an object.
+	 */
+	protected function decode_meta_value( string $raw ) {
+		if ( ! is_serialized( $raw ) ) {
+			return $raw;
+		}
+
+		$raw = trim( $raw );
+
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize -- Decoding is deliberate: a malformed value must not break the link action, and `allowed_classes` is false so no object is ever created.
+		$value = @unserialize( $raw, array( 'allowed_classes' => false ) );
+
+		if ( false === $value && 'b:0;' !== $raw ) {
+			return new \WP_Error( 'blc-meta-decode-error', esc_html__( 'Meta value could not be decoded.', 'broken-link-checker' ) );
+		}
+
+		if ( $this->contains_object( $value ) ) {
+			return new \WP_Error( 'blc-meta-decode-error', esc_html__( 'Meta value contains an object.', 'broken-link-checker' ) );
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Runs the processor on every string within a decoded meta value that holds the link.
+	 *
+	 * Strings that do not hold the link are skipped so the processor cannot reformat them.
+	 *
+	 * @param mixed          $value     The decoded meta value.
+	 * @param Link_Processor $processor The processor for the current action.
+	 * @param string         $old_link  The link being actioned.
+	 * @param string         $new_link  The replacement link (empty for unlink).
+	 * @return mixed The processed value.
+	 */
+	protected function execute_in_meta_value( $value, $processor, $old_link, $new_link ) {
+		if ( is_string( $value ) ) {
+			if ( '' === $value || false === stripos( $value, $old_link ) ) {
+				return $value;
+			}
+
+			return $processor->execute( $value, $old_link, $new_link );
+		}
+
+		if ( is_array( $value ) ) {
+			foreach ( $value as $key => $item ) {
+				$value[ $key ] = $this->execute_in_meta_value( $item, $processor, $old_link, $new_link );
+			}
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Recursively checks whether a decoded value contains any PHP object.
+	 *
+	 * Incomplete classes, created when unserialize() runs with `allowed_classes => false`,
+	 * are objects too.
+	 *
+	 * @param mixed $value The decoded value to inspect.
+	 * @return bool True when an object is found at any depth.
+	 */
+	protected function contains_object( $value ) {
+		if ( is_object( $value ) ) {
+			return true;
+		}
+
+		if ( ! is_array( $value ) ) {
+			return false;
+		}
+
+		foreach ( $value as $item ) {
+			if ( $this->contains_object( $item ) ) {
+				return true;
 			}
 		}
 

@@ -726,23 +726,6 @@ class blcLinkQuery {
 	}
 
 	/**
-	 * Print the appropriate heading for the given filter.
-	 *
-	 * @param array $current_filter
-	 * @return void
-	 */
-	function print_filter_heading( $current_filter ) {
-		echo '<h2>';
-		//Output a header matching the current filter
-		if ( $current_filter['count'] > 0 ) {
-			echo $current_filter['heading'] . " (<span class='current-link-count'>{$current_filter['count']}</span>)";
-		} else {
-			echo $current_filter['heading_zero'] . "<span class='current-link-count'></span>";
-		}
-		echo '</h2>';
-	}
-
-	/**
 	 * Execute a filter.
 	 *
 	 * Gathers paging and search parameters from $_GET and executes the specified filter.

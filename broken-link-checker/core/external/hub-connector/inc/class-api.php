@@ -20,6 +20,22 @@ class API {
 	use Singleton;
 
 	/**
+	 * Request keys hidden from debug logs.
+	 *
+	 * @since 1.1.1
+	 */
+	private const LOG_REDACTED_KEYS = array( 'authorization', 'api_key', 'auth_key', 'auth_cookies', 'cookies', 'signature', 'wdp_auth' );
+
+	/**
+	 * Initialize API hooks.
+	 *
+	 * @since 1.1.1
+	 */
+	protected function __construct() {
+		add_filter( 'http_request_args', array( $this, 'filter_package_request_args' ), 10, 2 );
+	}
+
+	/**
 	 * Check if member is logged in.
 	 *
 	 * @since 1.0.0
@@ -120,8 +136,7 @@ class API {
 	}
 
 	/**
-	 * Returns the full URL to the specified REST API endpoint and includes
-	 * the API key as last element in URL.
+	 * Returns a credential-free package API URL.
 	 *
 	 * Uses the function `rest_url()` to build the URL.
 	 *
@@ -132,14 +147,6 @@ class API {
 	 * @return string The full URL to the requested endpoint.
 	 */
 	public function rest_url_auth( $endpoint ) {
-		$api_key = $this->get_api_key();
-
-		// Append API key.
-		if ( false === strpos( $endpoint, '/' . $api_key ) ) {
-			$endpoint .= '/' . $api_key;
-		}
-
-		// Get full URL.
 		$url = $this->rest_url( $endpoint );
 
 		// Add hub site id if available.
@@ -149,6 +156,64 @@ class API {
 		}
 
 		return $url;
+	}
+
+	/**
+	 * Check whether a URL is a WPMU DEV package endpoint.
+	 *
+	 * @since 1.1.1
+	 *
+	 * @param string $url URL to validate.
+	 *
+	 * @return bool
+	 */
+	public function is_package_url( string $url ): bool {
+		$url_parts   = wp_parse_url( $url );
+		$server_url  = $this->rest_url( '' );
+		$server_port = wp_parse_url( $server_url, PHP_URL_PORT );
+		$url_port    = is_array( $url_parts ) ? ( $url_parts['port'] ?? null ) : null;
+
+		if (
+			! is_array( $url_parts )
+			|| preg_match( '/[\x00-\x20\x7F]/', $url )
+			|| isset( $url_parts['user'] )
+			|| isset( $url_parts['pass'] )
+			|| isset( $url_parts['fragment'] )
+			|| $url_port !== $server_port
+			|| 'https' !== strtolower( $url_parts['scheme'] ?? '' )
+			|| strtolower( $url_parts['host'] ?? '' ) !== strtolower( (string) wp_parse_url( $server_url, PHP_URL_HOST ) )
+		) {
+			return false;
+		}
+
+		$path      = (string) wp_parse_url( $url, PHP_URL_PATH );
+		$rest_base = (string) wp_parse_url( $server_url, PHP_URL_PATH );
+
+		return '' !== $rest_base && (bool) preg_match( '!^' . preg_quote( $rest_base, '!' ) . '(install|download)/[0-9]+/?$!', $path );
+	}
+
+	/**
+	 * Add package credentials only to validated WPMU DEV download requests.
+	 *
+	 * @since 1.1.2
+	 *
+	 * @param array  $args HTTP request arguments.
+	 * @param string $url  Request URL.
+	 *
+	 * @return array
+	 */
+	public function filter_package_request_args( $args, $url = '' ) {
+		if ( ! is_array( $args ) || ! is_string( $url ) || ! $this->is_package_url( $url ) || ! $this->has_api_key() ) {
+			return $args;
+		}
+
+		if ( ! is_array( $args['headers'] ?? null ) ) {
+			$args['headers'] = array();
+		}
+
+		$args['headers']['Authorization'] = $this->get_api_key();
+
+		return $args;
 	}
 
 	/**
@@ -163,10 +228,14 @@ class API {
 	 * @param bool $force      Optional forces a sync.
 	 * @param bool $auth_check Should check for API key.
 	 *
-	 * @return array|WP_Error
+	 * @return array|WP_Error|bool
 	 */
 	public function sync_site( $force = false, $auth_check = true ) {
 		global $wp_version;
+
+		if ( defined( '\WP_INSTALLING' ) ) {
+			return false;
+		}
 
 		// Only when logged in.
 		if ( $auth_check && ! $this->has_api_key( $force ) ) {
@@ -501,7 +570,7 @@ class API {
 
 		$url = '(unknown URL)';
 		if ( is_array( $response ) && isset( $response['request_url'] ) ) {
-			$url = $response['request_url'];
+			$url = $this->scrub_log_message( $response['request_url'] );
 		}
 
 		if ( empty( $error['message'] ) ) {
@@ -520,7 +589,7 @@ class API {
 			$caller_dump = "\n\t# " . implode( "\n\t# ", $trace );
 
 			if ( is_array( $response ) && isset( $response['request_url'] ) ) {
-				$caller_dump = "\n\tURL: " . $response['request_url'] . $caller_dump;
+				$caller_dump = "\n\tURL: " . $this->scrub_log_message( $response['request_url'] ) . $caller_dump;
 			}
 
 			// Log the error to PHP error log.
@@ -528,7 +597,7 @@ class API {
 				sprintf(
 					'[WPMUDEV API Error] %s | %s (%s [%s]) %s',
 					\WPMUDEV_HUB_CONNECTOR_VERSION,
-					$error['message'],
+					$this->scrub_log_message( $error['message'] ),
 					$url,
 					$error_code,
 					$caller_dump
@@ -585,9 +654,82 @@ class API {
 
 		// Only if logging is enabled.
 		if ( defined( '\WPMUDEV_API_DEBUG' ) && \WPMUDEV_API_DEBUG ) {
-			error_log( $data );
+			error_log( $this->scrub_log_message( $data ) );
 		}
 		// phpcs:enable WordPress.PHP.DevelopmentFunctions.error_log_error_log
+	}
+
+	/**
+	 * Build a log-safe JSON payload.
+	 *
+	 * @since 1.1.1
+	 *
+	 * @param mixed $data Payload to log.
+	 *
+	 * @return string
+	 */
+	public function prepare_log_payload( $data ): string {
+		if ( is_object( $data ) ) {
+			$data = json_decode( (string) wp_json_encode( $data ), true );
+		}
+
+		$json = wp_json_encode( $this->redact_for_log( $data ), JSON_PRETTY_PRINT );
+
+		return is_string( $json ) ? $this->scrub_log_message( $json ) : '[unencodable payload]';
+	}
+
+	/**
+	 * Recursively redact known credential fields.
+	 *
+	 * @since 1.1.1
+	 *
+	 * @param mixed $value Value to redact.
+	 *
+	 * @return mixed
+	 */
+	private function redact_for_log( $value ) {
+		if ( ! is_array( $value ) ) {
+			return $value;
+		}
+
+		foreach ( $value as $key => $item ) {
+			$is_secret     = is_string( $key ) && ( in_array( strtolower( $key ), self::LOG_REDACTED_KEYS, true ) || 0 === strpos( strtolower( $key ), 'signed_' ) );
+			$value[ $key ] = $is_secret ? $this->redact_value_for_log( $item ) : $this->redact_for_log( $item );
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Redact a credential value while preserving its shape.
+	 *
+	 * @since 1.1.1
+	 *
+	 * @param mixed $value Credential value.
+	 *
+	 * @return mixed
+	 */
+	private function redact_value_for_log( $value ) {
+		if ( is_array( $value ) ) {
+			return array_map( array( $this, 'redact_value_for_log' ), $value );
+		}
+
+		return is_scalar( $value ) ? '[****]' : $value;
+	}
+
+	/**
+	 * Remove the current API key from an assembled log message.
+	 *
+	 * @since 1.1.1
+	 *
+	 * @param string $message Log message.
+	 *
+	 * @return string
+	 */
+	private function scrub_log_message( $message ) {
+		$key = $this->get_api_key();
+
+		return is_string( $message ) && '' !== $key ? str_replace( $key, '[****]', $message ) : $message;
 	}
 
 	/**

@@ -153,6 +153,31 @@ Everything should be handled by npm. Note that you don't need to interact with G
 | `npm run compile` | Compile production ready assets.                         |
 | `npm run build`   | Build production ready submodule inside `/build/` folder |
 
+## Scoped PHP Dependencies
+
+Production dependencies support PHP 7.4+ and are committed as a scoped runtime artifact in `/lib/vendor`. PHP-Scoper is isolated in `/tools` and requires PHP 8.2+ at build time.
+
+```bash
+composer install --working-dir=tools --no-interaction --prefer-dist
+composer scope
+composer --working-dir=tools verify:dependencies
+composer --working-dir=tools verify:reproducibility
+```
+
+Commit regenerated `/lib/vendor` with `composer.json`, `composer.lock`, and changes under `/tools`. Never edit generated dependency files directly. Root `/vendor` and `/tools/vendor` are local-only.
+
+`npm run build` verifies that scoped runtime files and required licenses are packaged while Composer manifests, scoping tools, and legacy phpseclib files remain excluded.
+
+## Versioning
+
+Replace an existing semantic version from the project root:
+
+```bash
+composer --working-dir=tools version:replace -- 1.1.0 1.2.0
+```
+
+The command updates `connector.php`, `package.json`, and both root version records in `package-lock.json`. It aborts before writing unless every expected declaration contains the supplied old version, then regenerates `/lib/vendor` so its Composer metadata contains the new version. It does not create a commit, tag, or release build.
+
 ## Git Workflow
 
 - Create a new branch from `dev` branch: `git checkout -b branch-name`. Try to give it a descriptive name. For example:
@@ -164,8 +189,9 @@ Everything should be handled by npm. Note that you don't need to interact with G
 - File the new Pull Request against `dev` branch
 - Assign somebody to review your code.
 - Once the PR is approved and finished, merge it in `dev` branch.
-- Checkout `dev` branch.
-- Run `npm run build` and copy all files and folders from the `build` folder.
-- Checkout `master` branch (preferably in a different folder) and replace all files and folders with copied content from the `build` folder.
-- Commit and push the `master` branch changes.
+- After all checks pass, Pipelines builds that exact `dev` commit and uploads the versioned ZIP as usual.
+- Pipelines replaces the bot-owned `release/master` branch with the exact contents of `build/` and creates or updates a pull request to `master`.
+- Review and approve the generated pull request. Because approval reset is unavailable without Bitbucket Premium, treat approvals as advisory: before merging, manually confirm that the approval was given after the latest `release/master` update and source commit shown in the pull request. Do not edit `release/master` manually.
 - Inform all plugin devs to update the submodule to the latest commit.
+
+The promotion step requires a secured repository variable named `RELEASE_BOT_ACCESS_TOKEN`. Use a repository access token limited to repository read/write and pull-request read/write permissions. Protect `dev` and `master` from direct writes, and do not edit `release/master` manually.

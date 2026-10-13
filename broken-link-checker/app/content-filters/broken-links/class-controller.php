@@ -106,6 +106,29 @@ class Controller extends Base {
 		$css_class = apply_filters( 'wpmudev_blc_highlight_css_class', 'blc-broken-link' );
 		$data_attr = apply_filters( 'wpmudev_blc_highlight_data_attr', 'data-blc-broken' );
 
+		/*
+		 * Both values arrive from filters and are written straight into a tag, so
+		 * neither can be trusted. Reduce the class to what sanitize_html_class()
+		 * allows, and hold the attribute name to a data-* name.
+		 */
+		$css_class = implode(
+			' ',
+			array_filter(
+				array_map(
+					'sanitize_html_class',
+					preg_split( '/\s+/', (string) $css_class, -1, PREG_SPLIT_NO_EMPTY )
+				)
+			)
+		);
+
+		if ( '' === $css_class ) {
+			$css_class = 'blc-broken-link';
+		}
+
+		if ( ! preg_match( '/^data-[A-Za-z0-9_-]+$/', (string) $data_attr ) ) {
+			$data_attr = 'data-blc-broken';
+		}
+
 		// Replace & with (?:&amp;|&) so the pattern matches both the raw form
 		// and the HTML-entity form that WordPress writes into href attributes.
 		$broken_urls_escaped = array_map(
@@ -124,9 +147,38 @@ class Controller extends Base {
 			// Match anchor tags with href attributes containing any of the broken URLs.
 			$pattern,
 			function ( $matches ) use ( $css_class, $data_attr, &$modified ) {
+				$tag = $matches[0];
+
+				// Nothing to do if this anchor already carries the marker.
+				if ( false !== stripos( $tag, $data_attr . '=' ) ) {
+					return $tag;
+				}
+
 				$modified = true;
-				// Build the replacement anchor tag with the CSS class and data attribute added.
-				return '<a href="' . $matches[2] . $matches[3] . '" class="' . $css_class . '" ' . $data_attr . '="1">';
+
+				/*
+				 * The opening tag is kept exactly as it was written and only added to.
+				 * Rebuilding it around a fixed pair of double quotes used to let a quote
+				 * inside an originally single-quoted href close the attribute and open an
+				 * event handler, and it also dropped every other attribute on the anchor.
+				 */
+				$class_merges = 0;
+				$merged       = preg_replace(
+					'/(\sclass\s*=\s*)(["\'])(.*?)\2/i',
+					'${1}${2}${3} ' . $css_class . '${2}',
+					$tag,
+					1,
+					$class_merges
+				);
+
+				if ( $class_merges > 0 && null !== $merged ) {
+					// Appended to the class already on the tag; a second class attribute would be ignored.
+					$tag = $merged;
+				} else {
+					$tag = preg_replace( '/\s*>$/', ' class="' . $css_class . '">', $tag, 1 );
+				}
+
+				return preg_replace( '/\s*>$/', ' ' . $data_attr . '="1">', $tag, 1 );
 			},
 			$content
 		);

@@ -25,6 +25,81 @@ class Options {
 	const NAME = 'wpmudev_hc_options';
 
 	/**
+	 * Hub replay watermark option.
+	 *
+	 * @since 1.1.1
+	 */
+	const HUB_NONCE_OPTION = 'wpmudev_hc_hub_nonce';
+
+	/**
+	 * Atomically claim a Hub request timestamp.
+	 *
+	 * @since 1.1.1
+	 *
+	 * @param float $timestamp Request timestamp.
+	 *
+	 * @return bool
+	 */
+	public static function claim_hub_nonce( $timestamp ) {
+		global $wpdb;
+
+		$value = number_format( (float) $timestamp, 6, '.', '' );
+
+		for ( $attempt = 0; $attempt < 2; $attempt++ ) {
+			if ( is_multisite() ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Atomic compare-and-set cannot use the options API.
+				$claimed = $wpdb->query(
+					$wpdb->prepare(
+						"UPDATE {$wpdb->sitemeta} SET meta_value = %s WHERE site_id = %d AND meta_key = %s AND CAST( meta_value AS DECIMAL(20,6) ) < CAST( %s AS DECIMAL(20,6) )",
+						$value,
+						get_current_network_id(),
+						self::HUB_NONCE_OPTION,
+						$value
+					)
+				);
+			} else {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Atomic compare-and-set cannot use the options API.
+				$claimed = $wpdb->query(
+					$wpdb->prepare(
+						"UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND CAST( option_value AS DECIMAL(20,6) ) < CAST( %s AS DECIMAL(20,6) )",
+						$value,
+						self::HUB_NONCE_OPTION,
+						$value
+					)
+				);
+			}
+
+			if ( ! empty( $claimed ) ) {
+				self::flush_hub_nonce_cache();
+
+				return true;
+			}
+
+			if ( 0 === $attempt && add_site_option( self::HUB_NONCE_OPTION, 0 ) ) {
+				self::flush_hub_nonce_cache();
+				continue;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Flush Hub replay watermark caches after a direct database update.
+	 *
+	 * @since 1.1.1
+	 *
+	 * @return void
+	 */
+	private static function flush_hub_nonce_cache() {
+		if ( is_multisite() ) {
+			wp_cache_delete( get_current_network_id() . ':' . self::HUB_NONCE_OPTION, 'site-options' );
+		} else {
+			wp_cache_delete( self::HUB_NONCE_OPTION, 'options' );
+		}
+	}
+
+	/**
 	 * Returns the value of a module option.
 	 *
 	 * @since 1.0.0

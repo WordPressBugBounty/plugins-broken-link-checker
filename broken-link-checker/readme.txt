@@ -3,7 +3,7 @@ Contributors: managewp, wpmudev
 Tags: links, broken links, internal link, external link, broken images
 Requires at least: 5.2
 Tested up to: 7.1
-Stable tag: 2.4.14.1
+Stable tag: 2.4.15
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -207,6 +207,23 @@ We take plugin security incredibly seriously; if you have a bug or vulnerability
 6. Local Broken Link Checker engine settings
 
 == Changelog ==
+
+= 2.4.15 =
+* Fix: Fixing a broken link inside a block no longer changes other URLs in that block's settings, such as embeds and navigation links.
+* Fix: Broken link highlighting now keeps the link's other attributes intact.
+* Fix: SiteOrigin Page Builder layouts are no longer corrupted when a broken link inside them is edited or unlinked.
+* Fix: Broken links can now only be edited or removed by users who can edit the post, comment or other content containing them.
+* Fix: A message is now shown when editing or unlinking a broken link is not allowed.
+* Fix: Special characters in recipient names and links now display correctly in the activation email and on the activation and cancellation pages.
+* Fix: Special characters in post titles and source URLs now display correctly in the broken links list.
+* Fix: Special characters in the link text are now preserved when a broken link is unlinked.
+* Fix: Personalised links in the scan report emails now work for all recipients.
+* Fix: An existing .htaccess file in the log folder is no longer overwritten.
+* Improvement: The custom log file path is now validated when saved.
+* Improvement: The custom CSS entered in the settings is now validated when saved.
+* Improvement: Shortcodes in link and image URLs are now only expanded in content written by users who can edit posts.
+* Improvement: Stricter validation of the addresses the Local link checker connects to.
+* Improvement: Updated the bundled Hub Connector to the latest version.
 
 = 2.4.14.1 =
 * Fix: A server-side request vulnerability

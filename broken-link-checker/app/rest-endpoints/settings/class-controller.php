@@ -382,6 +382,14 @@ class Controller extends Rest_Api {
 				unset( $recipient['user_id'] );
 
 				/*
+				The name is plain text. It is sanitized here, before it is stored or used in the confirmation email,
+				as the save-time sanitization would keep markup in it.
+				*/
+				if ( isset( $recipient['name'] ) ) {
+					$recipient['name'] = sanitize_text_field( $recipient['name'] );
+				}
+
+				/*
 				 * Generate activation code and send activation links to recipients if not already.
 				 */
 				if ( isset( $recipient['key'] ) && isset( $recipient['email'] ) && ! in_array(
@@ -471,10 +479,14 @@ class Controller extends Rest_Api {
 	 * @return mixed
 	 */
 	private function generate_activation_link( string $activation_code = '' ) {
+		/*
+		 * add_query_arg() does not encode values. The code is base64, and a raw "+" would be read back as a space.
+		 * sanitize_text_field() must not be applied on top, as it strips the %XX octets rawurlencode() produces.
+		 */
 		return add_query_arg(
 			array(
 				'action'          => 'activate',
-				'activation_code' => sanitize_text_field( $activation_code ),
+				'activation_code' => rawurlencode( $activation_code ),
 			),
 			Activation_Webhook::instance()->webhook_url()
 		);
@@ -484,7 +496,7 @@ class Controller extends Rest_Api {
 		return add_query_arg(
 			array(
 				'action'          => 'cancel',
-				'activation_code' => sanitize_text_field( $activation_code ),
+				'activation_code' => rawurlencode( $activation_code ),
 			),
 			Activation_Webhook::instance()->webhook_url()
 		);

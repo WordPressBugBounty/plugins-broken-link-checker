@@ -221,7 +221,7 @@ class blcPostMeta extends blcContainer {
 			if ( $post ) {
 				$post_html .= sprintf(
 					'<span class="row-title">%s</span><br>',
-					get_the_title( $post )
+					esc_html( get_the_title( $post ) )
 				);
 			}
 			$post_html .= sprintf(
@@ -236,7 +236,7 @@ class blcPostMeta extends blcContainer {
 			'<a class="row-title" href="%s" title="%s">%s</a>',
 			esc_url( $this->get_edit_url() ),
 			esc_attr( __( 'Edit this post' ) ),
-			get_the_title( $this->container_id )
+			esc_html( get_the_title( $this->container_id ) )
 		);
 
 		return $post_html;
@@ -357,7 +357,7 @@ class blcPostMeta extends blcContainer {
 					'delete_failed',
 					sprintf(
 						__( 'Failed to delete post "%1$s" (%2$d)', 'broken-link-checker' ),
-						get_the_title( $this->container_id ),
+						esc_html( get_the_title( $this->container_id ) ),
 						$this->container_id
 					)
 				);
@@ -376,7 +376,7 @@ class blcPostMeta extends blcContainer {
 				'trash_disabled',
 				sprintf(
 					__( 'Can\'t move post "%1$s" (%2$d) to the trash because the trash feature is disabled', 'broken-link-checker' ),
-					get_the_title( $this->container_id ),
+					esc_html( get_the_title( $this->container_id ) ),
 					$this->container_id
 				)
 			);
@@ -395,7 +395,7 @@ class blcPostMeta extends blcContainer {
 				'trash_failed',
 				sprintf(
 					__( 'Failed to move post "%1$s" (%2$d) to the trash', 'broken-link-checker' ),
-					get_the_title( $this->container_id ),
+					esc_html( get_the_title( $this->container_id ) ),
 					$this->container_id
 				)
 			);
@@ -406,6 +406,15 @@ class blcPostMeta extends blcContainer {
 		$post             = get_post( $this->container_id );
 		$post_type_object = get_post_type_object( $post->post_type );
 		return current_user_can( $post_type_object->cap->delete_post, $this->container_id );
+	}
+
+	/**
+	 * Check if the current user can edit the post this custom field belongs to.
+	 *
+	 * @return bool
+	 */
+	function current_user_can_edit() {
+		return current_user_can( 'edit_post', $this->container_id );
 	}
 
 	function can_be_trashed() {

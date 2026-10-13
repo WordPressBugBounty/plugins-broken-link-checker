@@ -48,8 +48,21 @@ class Replace_Regex_Processor extends Abstract_Regex_Processor {
 						$old_link = untrailingslashit( trim( $found[2], '\'"' ) );
 
 						if ( $this->link_processor->links_match( $link, $old_link ) ) {
-							// Replace only the attribute value, not the tag content or other attributes.
-							return preg_replace( "#({$tag_att}=[\"|\'])" . $old_link . '/?(["|\'])#i', '\1' . $new_link . '\2', $found[0], 1 );
+							/*
+							 * The old link is quoted before it goes into the pattern - a URL
+							 * carrying ( ) + or ? would otherwise be read as regex syntax - and
+							 * the new one is put in through a callback, so neither a $ in the URL
+							 * nor a backreference sequence is interpreted. esc_url() encodes the
+							 * quote characters, so the value cannot close the attribute it sits in.
+							 */
+							return preg_replace_callback(
+								'#(' . preg_quote( $tag_att, '#' ) . '=["\'])' . preg_quote( $old_link, '#' ) . '/?(["\'])#i',
+								static function ( $parts ) use ( $new_link ) {
+									return $parts[1] . esc_url( $new_link ) . $parts[2];
+								},
+								$found[0],
+								1
+							);
 						}
 
 						return $found[0];

@@ -400,6 +400,16 @@ class Admin {
 				return $this->update_vars( array( 'auth_error' => $error ) );
 			}
 
+			$incoming_api_key = trim( sanitize_key( wp_unslash( $_REQUEST['set_apikey'] ?? $_REQUEST['user_apikey'] ?? '' ) ) );
+			$current_api_key  = API::get()->get_api_key();
+			if ( '' !== $current_api_key && '' !== $incoming_api_key && ! hash_equals( $current_api_key, $incoming_api_key ) ) {
+				return $this->update_vars(
+					array(
+						'auth_error' => __( 'This site is already connected to a different WPMU DEV account. Log out before connecting another account.', 'wpmudev' ),
+					)
+				);
+			}
+
 			// Is team selection callback.
 			if ( $this->is_team_selection() ) {
 				$user_api_key = trim( sanitize_key( wp_unslash( $_REQUEST['user_apikey'] ?? '' ) ) );

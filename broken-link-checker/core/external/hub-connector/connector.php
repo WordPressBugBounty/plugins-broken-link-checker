@@ -18,7 +18,7 @@ if ( ! defined( '\WPMUDEV_HUB_CONNECTOR_FILE' ) ) {
 
 // Module version.
 if ( ! defined( '\WPMUDEV_HUB_CONNECTOR_VERSION' ) ) {
-	define( 'WPMUDEV_HUB_CONNECTOR_VERSION', '1.1.0' );
+	define( 'WPMUDEV_HUB_CONNECTOR_VERSION', '1.1.1' );
 }
 
 // SUI version.
@@ -75,6 +75,8 @@ if ( ! class_exists( '\WPMUDEV\Hub\Connector' ) ) {
 			if ( ! empty( Connector\Data::get()->get_full_wpmu_dev_hosting_id() ) ) {
 				return;
 			}
+
+			require_once __DIR__ . '/lib/vendor/autoload.php';
 
 			// Init classes.
 			Connector\Rest::get();

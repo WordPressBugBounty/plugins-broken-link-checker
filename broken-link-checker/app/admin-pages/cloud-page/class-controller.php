@@ -424,14 +424,14 @@ class Controller extends Admin_Page {
 			'roles',
 			array(
 				'get_callback'    => function ( $obj, $field_name, $request ) {
-					$referer = $request->get_header( 'referer' );
+					$user_id = isset( $obj['id'] ) ? (int) $obj['id'] : 0;
 
-					if ( ! $referer || Utilities::get_query_var( $referer, 'page' ) !== $this->menu_slug ) {
+					if ( ! $this->can_view_roles( $user_id ) ) {
 						return '';
 					}
 
 					// Return up to the first 3 roles.
-					return implode( ', ', array_slice( Utilities::user_role_names( $obj['id'] ), 0, 3 ) );
+					return implode( ', ', array_slice( Utilities::user_role_names( $user_id ), 0, 3 ) );
 				},
 				'update_callback' => null,
 				'schema'          => array(
@@ -453,6 +453,11 @@ class Controller extends Admin_Page {
 	public function prepare_rest_user_fields( $data, $user, $request ) {
 		$referer = $request->get_header( 'referer' );
 
+		/*
+		 * Referer decides only whether this response is being shaped for the plugin's own
+		 * screen. The caller sets it, so it never decides what may be read; the capability
+		 * check further down does that.
+		 */
 		if ( ! $referer || Utilities::get_query_var( $referer, 'page' ) !== $this->menu_slug ) {
 			return $data;
 		}
@@ -474,9 +479,37 @@ class Controller extends Admin_Page {
 		unset( $data->data['meta'] );
 		unset( $data->data['_links'] );
 
-		$data->data['roles'] = implode( ', ', Utilities::user_role_names( $user->ID ) );
+		if ( $this->can_view_roles( (int) $user->ID ) ) {
+			$data->data['roles'] = implode( ', ', Utilities::user_role_names( $user->ID ) );
+		} else {
+			unset( $data->data['roles'] );
+		}
 
 		return $data;
+	}
+
+	/**
+	 * Whether the current request may be told a user's roles.
+	 *
+	 * The HTTP Referer cannot answer this - the caller writes it, so an unauthenticated
+	 * request can present any value it likes. Roles are disclosed only to a logged-in
+	 * user who could already read them from the users screen, or to that user about
+	 * their own account.
+	 *
+	 * @param int $user_id The account whose roles were asked for.
+	 *
+	 * @return bool
+	 */
+	private function can_view_roles( int $user_id ) {
+		if ( $user_id <= 0 || ! is_user_logged_in() ) {
+			return false;
+		}
+
+		if ( get_current_user_id() === $user_id ) {
+			return true;
+		}
+
+		return current_user_can( 'list_users' ) || current_user_can( 'edit_user', $user_id );
 	}
 
 	/**

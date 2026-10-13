@@ -221,13 +221,13 @@ if ( ! class_exists( 'blcTablePrinter' ) ) {
 
 			<div class="view-switch">
 				<a
-					href="<?php echo esc_url( add_query_arg( 'compact', '1', $_SERVER['REQUEST_URI'] ) ); ?>"
+					href="<?php echo esc_url( wp_nonce_url( add_query_arg( 'compact', '1', $_SERVER['REQUEST_URI'] ), 'blc-toggle-compact' ) ); ?>"
 					class="view-list <?php echo $table_compact ? 'current' : ''; ?>"
 					title="<?php echo esc_attr( __( 'Compact View', 'broken-link-checker' ) ); ?>"
 					aria-label="<?php echo esc_attr( __( 'Compact View', 'broken-link-checker' ) ); ?>">
 				</a>
 				<a
-					href="<?php echo esc_url( add_query_arg( 'compact', '0', $_SERVER['REQUEST_URI'] ) ); ?>"
+					href="<?php echo esc_url( wp_nonce_url( add_query_arg( 'compact', '0', $_SERVER['REQUEST_URI'] ), 'blc-toggle-compact' ) ); ?>"
 					class="view-excerpt <?php echo ! $table_compact ? 'current' : ''; ?>"
 					title="<?php echo esc_attr( __( 'Detailed View', 'broken-link-checker' ) ); ?>"
 					aria-label="<?php echo esc_attr( __( 'Detailed View', 'broken-link-checker' ) ); ?>">
@@ -869,8 +869,10 @@ if ( ! class_exists( 'blcTablePrinter' ) ) {
 
 		function column_redirect_url( $link, $instances ) {
 			if ( $link->redirect_count > 0 ) {
+				// esc_attr() encodes the delimiters but permits any scheme; an href needs esc_url().
 				printf(
-					'<a href="%1$s" target="_blank" class="blc-redirect-url" title="%1$s">%2$s</a>',
+					'<a href="%1$s" target="_blank" class="blc-redirect-url" title="%2$s">%3$s</a>',
+					esc_url( $link->final_url ),
 					esc_attr( $link->final_url ),
 					esc_html( $link->final_url )
 				);

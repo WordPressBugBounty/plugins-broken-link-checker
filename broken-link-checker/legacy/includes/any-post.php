@@ -511,7 +511,7 @@ class blcPostTypeOverlord {
 	 * @return void
 	 */
 	function hook_wp_head() {
-		echo '<style>',$this->plugin_conf->options['broken_link_css'],'</style>';
+		echo '<style>', blc_sanitize_custom_css( $this->plugin_conf->options['broken_link_css'] ), '</style>';
 	}
 }
 
@@ -530,6 +530,24 @@ class blcAnyPostContainer extends blcContainer {
 	var $default_field = 'post_content';
 
 	public $updating_urls = null;
+
+	/**
+	 * Only trust posts whose author can write posts, and so could use shortcodes
+	 * in them anyway.
+	 *
+	 * Post type alone is not enough: forum topics and replies, and posts made by
+	 * front-end submission forms, can be written by subscribers or visitors.
+	 *
+	 * @return bool
+	 */
+	public function allows_url_shortcodes() {
+		$post = $this->get_wrapped_object();
+		if ( ! $post || empty( $post->post_author ) ) {
+			return false;
+		}
+
+		return user_can( (int) $post->post_author, 'edit_posts' );
+	}
 
 	/**
 	 * Get action links for this post.
@@ -588,6 +606,7 @@ class blcAnyPostContainer extends blcContainer {
 		}
 
 		//View/Preview link
+		// Not escaped here: both uses below pass it through esc_attr().
 		$title = get_the_title( $this->container_id );
 		if ( in_array( $post->post_status, array( 'pending', 'draft' ) ) ) {
 			if ( current_user_can( $post_type_object->cap->edit_post, $this->container_id ) ) {
@@ -622,16 +641,16 @@ class blcAnyPostContainer extends blcContainer {
 		if ( 'email' === $context ) {
 			$source = sprintf(
 				$source,
-				get_the_permalink( $this->container_id ),
+				esc_url( get_the_permalink( $this->container_id ) ),
 				esc_attr( __( 'View this item' ) ),
-				get_the_title( $this->container_id )
+				esc_html( get_the_title( $this->container_id ) )
 			);
 		} else {
 			$source = sprintf(
 				$source,
-				$this->get_edit_url(),
+				esc_url( $this->get_edit_url() ),
 				esc_attr( __( 'Edit this item' ) ),
-				get_the_title( $this->container_id )
+				esc_html( get_the_title( $this->container_id ) )
 			);
 		}
 
@@ -821,7 +840,7 @@ class blcAnyPostContainer extends blcContainer {
 					'delete_failed',
 					sprintf(
 						__( 'Failed to delete post "%1$s" (%2$d)', 'broken-link-checker' ),
-						get_the_title( $this->container_id ),
+						esc_html( get_the_title( $this->container_id ) ),
 						$this->container_id
 					)
 				);
@@ -840,7 +859,7 @@ class blcAnyPostContainer extends blcContainer {
 				'trash_disabled',
 				sprintf(
 					__( 'Can\'t move post "%1$s" (%2$d) to the trash because the trash feature is disabled', 'broken-link-checker' ),
-					get_the_title( $this->container_id ),
+					esc_html( get_the_title( $this->container_id ) ),
 					$this->container_id
 				)
 			);
@@ -860,7 +879,7 @@ class blcAnyPostContainer extends blcContainer {
 				'trash_failed',
 				sprintf(
 					__( 'Failed to move post "%1$s" (%2$d) to the trash', 'broken-link-checker' ),
-					get_the_title( $this->container_id ),
+					esc_html( get_the_title( $this->container_id ) ),
 					$this->container_id
 				)
 			);
@@ -876,6 +895,29 @@ class blcAnyPostContainer extends blcContainer {
 		$post             = $this->get_wrapped_object();
 		$post_type_object = get_post_type_object( $post->post_type );
 		return current_user_can( $post_type_object->cap->delete_post, $this->container_id );
+	}
+
+	/**
+	 * Check if the current user can edit this post.
+	 *
+	 * Uses the post type's mapped meta capability, so custom post types with
+	 * their own capabilities (and the Site Editor's wp_template / wp_template_part
+	 * types, whose edit caps map to edit_theme_options) are enforced correctly.
+	 *
+	 * @return bool
+	 */
+	function current_user_can_edit() {
+		$post = $this->get_wrapped_object();
+		if ( ! $post ) {
+			return false;
+		}
+
+		$post_type_object = get_post_type_object( $post->post_type );
+		if ( ! $post_type_object ) {
+			return false;
+		}
+
+		return current_user_can( $post_type_object->cap->edit_post, $this->container_id );
 	}
 
 	function can_be_trashed() {

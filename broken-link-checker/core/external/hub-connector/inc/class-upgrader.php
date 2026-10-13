@@ -68,14 +68,63 @@ class Upgrader {
 	 * @return bool
 	 */
 	public function install( $item, $type = 'plugin', $options = array() ) {
+		return $this->do_install( $item, $type, $options );
+	}
+
+	/**
+	 * Install a Hub-signed plugin or theme.
+	 *
+	 * @since 1.1.1
+	 *
+	 * @param string $item        Item to install.
+	 * @param string $type        Item type.
+	 * @param array  $signed_list Signed item list.
+	 * @param string $signature   List signature.
+	 * @param array  $options     Install options.
+	 *
+	 * @return bool
+	 */
+	public function install_signed( $item, $type, $signed_list, $signature, $options = array() ) {
+		$this->reset_errors();
+
+		$signed = (
+			is_array( $signed_list )
+			&& Remote::get()->verify_signed_data( $signed_list, is_string( $signature ) ? $signature : '' )
+			&& in_array( (string) $item, array_map( 'strval', $signed_list ), true )
+		);
+
+		if ( ! $signed ) {
+			$this->add_error( 'INS.13', __( 'Invalid package signature', 'wpmudev' ) );
+
+			return false;
+		}
+
+		return $this->do_install( $item, $type, $options, true );
+	}
+
+	/**
+	 * Shared installer implementation.
+	 *
+	 * @since 1.1.2
+	 *
+	 * @param string $item           Item to install.
+	 * @param string $type           Item type.
+	 * @param array  $options        Install options.
+	 * @param bool   $is_trusted_url Whether a signed package URL is allowed.
+	 *
+	 * @return bool
+	 */
+	private function do_install( $item, $type = 'plugin', $options = array(), $is_trusted_url = false ) {
 		$this->reset_errors();
 		$this->options = $options;
 
-		// Setup temp filters.
-		$this->setup_filters();
-
 		// If the string is already a URL.
 		if ( filter_var( $item, FILTER_VALIDATE_URL ) ) {
+			if ( ! $is_trusted_url ) {
+				$this->add_error( 'INS.12', __( 'Package URLs require a valid Hub signature', 'wpmudev' ) );
+
+				return false;
+			}
 			$link = esc_url_raw( $item );
 		} else {
 			// Get download link.
@@ -88,6 +137,9 @@ class Upgrader {
 
 			return false;
 		}
+
+		// Setup temp filters.
+		$this->setup_filters();
 
 		$skin = new WP_Ajax_Upgrader_Skin();
 

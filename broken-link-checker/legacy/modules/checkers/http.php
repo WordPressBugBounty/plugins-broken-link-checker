@@ -273,27 +273,58 @@ class blcHttpCheckerBase extends blcChecker {
 
 		$addresses = array();
 
+		foreach ( $this->lookup_dns_records( $host ) as $record ) {
+			if ( ! empty( $record['ip'] ) ) {
+				$addresses[] = $record['ip'];
+			} elseif ( ! empty( $record['ipv6'] ) ) {
+				$addresses[] = $record['ipv6'];
+			}
+		}
+
+		// Always add the answer the operating system gives as well, and not only
+		// when the DNS lookup comes back empty. It is the lookup cURL and core
+		// perform, so it can disagree with dns_get_record(): a resolver may answer
+		// for a name the system reads as an address literal. Every address has to
+		// be cleared, so the union can only make the guard stricter.
+		$resolved = @gethostbyname( $host );
+		if ( ! empty( $resolved ) && $resolved !== $host ) {
+			$addresses[] = $resolved;
+		}
+
+		return array_values( array_unique( $addresses ) );
+	}
+
+	/**
+	 * Look up a host's A and AAAA records.
+	 *
+	 * Kept apart from resolve_host() so a test can stand in for the resolver.
+	 *
+	 * @param string $host Host name.
+	 * @return array[] DNS records, empty when the lookup fails or is unavailable.
+	 */
+	protected function lookup_dns_records( $host ) {
 		$records = @dns_get_record( $host, DNS_A | DNS_AAAA );
-		if ( is_array( $records ) ) {
-			foreach ( $records as $record ) {
-				if ( ! empty( $record['ip'] ) ) {
-					$addresses[] = $record['ip'];
-				} elseif ( ! empty( $record['ipv6'] ) ) {
-					$addresses[] = $record['ipv6'];
-				}
-			}
+
+		return is_array( $records ) ? $records : array();
+	}
+
+	/**
+	 * Determine whether a host is spelled like an IPv4 address without being one.
+	 *
+	 * Octal (0177.0.0.1), hexadecimal (0x7f.0.0.1), decimal (2130706433) and short
+	 * (127.1) forms do not parse as an address, yet cURL and the system resolver
+	 * read them as one. Which address they mean is decided by whichever lookup
+	 * answers, so they are refused outright and never resolved.
+	 *
+	 * @param string $host Host taken from the URL.
+	 * @return bool
+	 */
+	protected function is_non_canonical_ip_host( $host ) {
+		if ( filter_var( $host, FILTER_VALIDATE_IP ) ) {
+			return false;
 		}
 
-		// dns_get_record() is neither available nor useful on every host, so fall
-		// back to the same lookup core performs.
-		if ( empty( $addresses ) ) {
-			$resolved = @gethostbyname( $host );
-			if ( ! empty( $resolved ) && $resolved !== $host ) {
-				$addresses[] = $resolved;
-			}
-		}
-
-		return $addresses;
+		return (bool) preg_match( '/^(0x[0-9a-f]*|[0-9]+)(\.(0x[0-9a-f]*|[0-9]+)){0,3}$/i', $host );
 	}
 
 	/**
@@ -327,6 +358,10 @@ class blcHttpCheckerBase extends blcChecker {
 			return true;
 		}
 
+		if ( $this->is_non_canonical_ip_host( $host ) ) {
+			return false;
+		}
+
 		$addresses = $this->resolve_host( $host );
 
 		// A host we cannot resolve is a host we cannot clear.
@@ -341,6 +376,42 @@ class blcHttpCheckerBase extends blcChecker {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Normalise a URL and clear it for a request.
+	 *
+	 * Every HTTP request the plugin makes has to come through here first - both
+	 * the URL a check starts with and each redirect target it walks to. The order
+	 * matters: clean_url() runs html_entity_decode(), so validating ahead of it
+	 * would leave the string that was checked free to disagree with the string
+	 * that is ultimately requested.
+	 *
+	 * @param string $url URL to prepare.
+	 * @return string The URL to request, or an empty string when it must not be
+	 *                requested at all.
+	 */
+	protected function prepare_url( $url ) {
+		$url = $this->clean_url( $url );
+
+		/*
+		 * wp_http_validate_url() runs wp_kses_bad_protocol() itself and refuses
+		 * any URL whose protocol had to be stripped, so a javascript:, file: or
+		 * gopher: address comes back from it as false.
+		 *
+		 * Running the protocol filter here first would be worse than redundant.
+		 * wp_kses_bad_protocol() strips the offending protocol rather than
+		 * rejecting the string, so passing its output on would hand a schemeless
+		 * URL - a different URL from the one that was supplied - to the guard
+		 * below, which would then have nothing left to object to.
+		 */
+		$url = wp_http_validate_url( $url );
+
+		if ( empty( $url ) || ! $this->is_safe_url( $url ) ) {
+			return '';
+		}
+
+		return $url;
 	}
 
 }
@@ -367,10 +438,9 @@ class blcCurlHttp extends blcHttpCheckerBase {
 		 * html_entity_decode(), so validating ahead of it would leave the two free
 		 * to disagree about where the URL actually points.
 		 */
-		$url = wp_kses_bad_protocol( $this->clean_url( $url ), array( 'http', 'https', 'ssl' ) );
-		$url = wp_http_validate_url( $url );
+		$url = $this->prepare_url( $url );
 
-		if ( empty( $url ) || ! $this->is_safe_url( $url ) ) {
+		if ( empty( $url ) ) {
 			$blclog->error( __CLASS__ . ' Invalid URL:', $url );
 
 			$result = array(
@@ -797,9 +867,26 @@ class blcCurlHttp extends blcHttpCheckerBase {
 
 class blcWPHttp extends blcHttpCheckerBase {
 
+	/**
+	 * Check a URL with the WordPress HTTP API.
+	 *
+	 * This is the fallback transport, used when cURL is unavailable or has been
+	 * switched off. It has to hold the same destination boundary as the cURL
+	 * checker: every address it is about to request, redirect targets included,
+	 * is cleared by is_safe_url() first.
+	 *
+	 * wp_http_validate_url() is not a boundary worth delegating to. The set of
+	 * ranges it rejects has been extended across releases and backports, so what
+	 * it catches depends on the WordPress version in use, and it resolves only a
+	 * host's IPv4 addresses. On a version whose core does not reject the
+	 * link-local range, this path requested the cloud metadata endpoint
+	 * (169.254.169.254) and recorded the result.
+	 *
+	 * @param string $url URL to check.
+	 * @return array
+	 */
 	function check( $url ) {
 
-		// $url = $this->clean_url( $url );
 		// Note : Snoopy doesn't work too well with HTTPS URLs.
 
 		$result = array(
@@ -812,21 +899,101 @@ class blcWPHttp extends blcHttpCheckerBase {
 		$conf    = blc_get_configuration();
 		$timeout = $conf->options['timeout'];
 
+		global $blclog;
+
+		/*
+		 * Normalise first and validate afterwards, so the string that gets
+		 * checked is the string that ultimately gets requested. clean_url() runs
+		 * html_entity_decode(), so validating ahead of it would leave the two
+		 * free to disagree about where the URL actually points.
+		 */
+		$url = $this->prepare_url( $url );
+
+		if ( empty( $url ) ) {
+			$blclog->error( __CLASS__ . ' Invalid URL:', $url );
+
+			$result = array(
+				'warning'     => true,
+				'log'         => "Invalid URL.\nURL fails to pass validation for safe use in the HTTP API.",
+				'status_text' => __( 'Invalid URL', 'broken-link-checker' ),
+				'error_code'  => 'invalid_url',
+				'status_code' => BLC_LINK_STATUS_WARNING,
+			);
+
+			return $result;
+		}
+
 		$start_time = microtime_float();
 
 		// Fetch the URL with WP_Http. Try HEAD first to avoid downloading the body.
 		$request_args = array(
-			'timeout'    => $timeout,
-			'user-agent' => 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)', // masquerade as IE 7
-			'aa'         => 1024 * 5,
+			'timeout'     => $timeout,
+			'user-agent'  => 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)', // masquerade as IE 7
+			'aa'          => 1024 * 5,
+			/*
+			 * Walk the redirect chain here rather than letting the HTTP API follow
+			 * it, so every hop can be cleared before it is requested. With core
+			 * following redirects, only the URL the check started with was ever
+			 * validated: a Location header pointing at a loopback, private or
+			 * link-local address was followed without question. Note that core only
+			 * disables following for the HEAD request itself - the GET retry below
+			 * would otherwise follow the chain on a checker's behalf.
+			 */
+			'redirection' => 0,
 		);
 
-		$request   = wp_safe_remote_head( $this->urlencodefix( $url ), $request_args );
-		$http_code = is_wp_error( $request ) ? 0 : (int) wp_remote_retrieve_response_code( $request );
+		$max_redirects  = 10;
+		$redirect_count = 0;
+		$request_url    = $url;
+		$final_url      = $url;
+		$blocked_url    = '';
+		$request        = null;
+		$http_code      = 0;
 
-		// Fall back to GET if the server rejected HEAD (405 Method Not Allowed) or returned nothing.
-		if ( in_array( $http_code, array( 0, 405 ), true ) ) {
-			$request = wp_safe_remote_get( $this->urlencodefix( $url ), $request_args );
+		while ( true ) {
+			$request   = wp_safe_remote_head( $this->urlencodefix( $request_url ), $request_args );
+			$http_code = is_wp_error( $request ) ? 0 : (int) wp_remote_retrieve_response_code( $request );
+
+			// Fall back to GET if the server rejected HEAD (405 Method Not Allowed) or returned nothing.
+			if ( in_array( $http_code, array( 0, 405 ), true ) ) {
+				$request   = wp_safe_remote_get( $this->urlencodefix( $request_url ), $request_args );
+				$http_code = is_wp_error( $request ) ? 0 : (int) wp_remote_retrieve_response_code( $request );
+			}
+
+			$final_url = $request_url;
+
+			// Anything that is not a redirect is the end of the chain.
+			if ( $http_code < 300 || $http_code >= 400 ) {
+				break;
+			}
+
+			$location = is_wp_error( $request ) ? '' : wp_remote_retrieve_header( $request, 'location' );
+			if ( is_array( $location ) ) {
+				// A server sending more than one Location header does not get to
+				// pick which one is followed; take the first, as browsers do.
+				$location = reset( $location );
+			}
+			$location = (string) $location;
+
+			if ( '' === $location ) {
+				break;
+			}
+
+			if ( $redirect_count >= $max_redirects ) {
+				$log .= sprintf( "[Warning] Stopped following redirects after %d hops.\n", $max_redirects );
+				break;
+			}
+
+			$next_url = WP_Http::make_absolute_url( $location, $request_url );
+
+			// The same guard the starting URL went through, applied to every hop.
+			if ( ! $this->is_safe_url( $next_url ) ) {
+				$blocked_url = $next_url;
+				break;
+			}
+
+			$request_url = $next_url;
+			++$redirect_count;
 		}
 
 		// request timeout results in WP ERROR
@@ -837,6 +1004,50 @@ class blcWPHttp extends blcHttpCheckerBase {
 		} else {
 			$result['http_code'] = wp_remote_retrieve_response_code( $request ); // HTTP status code
 			$result['message']   = wp_remote_retrieve_response_message( $request );
+		}
+
+		/*
+		 * The chain ended at a target we are not allowed to request. Report the
+		 * link as unverified instead of following it, and deliberately do not
+		 * expose the blocked target: a non-zero redirect_count paired with a
+		 * final_url is what the "Fix redirect" action rewrites post content to,
+		 * and we have not established where this chain actually ends. Only the
+		 * host is logged, and it is escaped at write time like the rest of the
+		 * log.
+		 */
+		if ( '' !== $blocked_url ) {
+			$blocked_host = @parse_url( $blocked_url, PHP_URL_HOST );
+
+			$result['final_url']      = $url;
+			$result['redirect_count'] = 0;
+			$result['broken']         = false;
+			$result['timeout']        = false;
+			$result['warning']        = true;
+			$result['status_code']    = BLC_LINK_STATUS_WARNING;
+			$result['status_text']    = __( 'Unsafe Redirect', 'broken-link-checker' );
+			$result['error_code']     = 'unsafe_redirect';
+
+			$log .= sprintf(
+				/* translators: %s: host name of the redirect target that was refused. */
+				__( 'Refused to follow a redirect to "%s" because it resolves to a private, loopback or otherwise reserved address.', 'broken-link-checker' ),
+				esc_html( (string) $blocked_host )
+			) . "\n";
+
+			$blclog->error( __CLASS__ . ' Refused an unsafe redirect for:', $url );
+
+			$result['log'] = $log;
+
+			$result['result_hash'] = implode(
+				'|',
+				array(
+					$result['http_code'],
+					'0',
+					'0',
+					blcLink::remove_query_string( $result['final_url'] ),
+				)
+			);
+
+			return $result;
 		}
 
 		// Build the log
@@ -863,7 +1074,17 @@ class blcWPHttp extends blcHttpCheckerBase {
 		$log          .= '<em>(' . __( 'Using WP HTTP', 'broken-link-checker' ) . ')</em>';
 		$result['log'] = $log;
 
-		$result['final_url'] = $url;
+		/*
+		 * A redirect we did not follow - one with no usable Location header, or one
+		 * that hit the hop limit - still reads as a redirect in the Status column,
+		 * the same way the cURL checker treats that case.
+		 */
+		if ( ( 0 === absint( $redirect_count ) ) && ( in_array( $result['http_code'], array( 301, 302, 303, 307 ) ) ) ) {
+			$redirect_count = 1;
+		}
+
+		$result['final_url']      = $final_url;
+		$result['redirect_count'] = $redirect_count;
 
 		// The hash should contain info about all pieces of data that pertain to determining if the
 		// link is working.

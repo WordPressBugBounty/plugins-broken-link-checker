@@ -277,7 +277,10 @@ jQuery(function($){
 				}
 			},
 			'json'
-		);
+		).fail(function (xhr) {
+			me.closest('span').hide();
+			alertAjaxFailure(xhr);
+		});
 
 		return false;
 	});
@@ -285,6 +288,31 @@ jQuery(function($){
 	function flashElementGreen(element, callback) {
 		var oldColor = element.css('background-color');
 		element.animate({ backgroundColor: "#E0FFB3" }, 200).animate({ backgroundColor: oldColor }, 300, callback);
+	}
+
+	/**
+	 * Show the error from a failed link action request.
+	 *
+	 * A refused action (HTTP 403) never reaches the success callback, so without
+	 * this the page would be left waiting with no message.
+	 *
+	 * @param {Object} xhr The jqXHR of the failed request.
+	 */
+	function alertAjaxFailure(xhr) {
+		var message = '<?php echo esc_js( __( 'An unexpected error occurred!', 'broken-link-checker' ) ); ?>';
+
+		if (xhr && xhr.responseText) {
+			try {
+				var data = JSON.parse(xhr.responseText);
+				if (data && (typeof(data['error']) != 'undefined')) {
+					message = data.error;
+				}
+			} catch (e) {
+				//Not JSON; keep the generic message.
+			}
+		}
+
+		alert(message);
 	}
 
 
@@ -510,7 +538,14 @@ jQuery(function($){
 				hideLinkEditor(editRow);
 			},
 			'json'
-		);
+		).fail(function(xhr) {
+			progressIndicator.hide();
+			updateButton.prop('disabled', false);
+
+			alertAjaxFailure(xhr);
+
+			hideLinkEditor(editRow);
+		});
 
 	}
 
@@ -715,7 +750,10 @@ jQuery(function($){
 
 					$(me).html('<?php echo esc_js( __( 'Unlink', 'broken-link-checker' ) ); ?>');
 				}
-			);
+			).fail(function (xhr) {
+				alertAjaxFailure(xhr);
+				$(me).html('<?php echo esc_js( __( 'Unlink', 'broken-link-checker' ) ); ?>');
+			});
 
 		}
 	});

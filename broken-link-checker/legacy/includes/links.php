@@ -1161,10 +1161,19 @@ function blc_cleanup_links( $link_id = null ) {
 				{$wpdb->prefix}blc_instances.link_id IS NULL";
 
 	if ( null !== $link_id ) {
-		if ( ! is_array( $link_id ) ) {
-			$link_id = array( intval( $link_id ) );
+		$link_ids = array_filter( wp_parse_id_list( $link_id ) );
+
+		/*
+		 * An empty list means "none of these links", not "every orphan". Falling through
+		 * would widen the DELETE to the whole table.
+		 */
+		if ( empty( $link_ids ) ) {
+			return true;
 		}
-		$q .= " AND {$wpdb->prefix}blc_links.link_id IN (" . implode( ', ', $link_id ) . ')';
+
+		$placeholders = implode( ', ', array_fill( 0, count( $link_ids ), '%d' ) );
+
+		$q .= $wpdb->prepare( " AND {$wpdb->prefix}blc_links.link_id IN ($placeholders)", $link_ids ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
 
 	$rez     = $wpdb->query( $q ); //phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared

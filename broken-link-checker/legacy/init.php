@@ -65,6 +65,28 @@ if ( defined( 'BLC_ACTIVE' ) ) {
 					Configuration
 	*/
 	// Create and register configuration managers.
+if ( ! function_exists( 'blc_sanitize_custom_css' ) ) {
+	/**
+	 * Reduce a stored custom CSS option to something that cannot leave its style element.
+	 *
+	 * The option is only writable by a user with unfiltered_html, so this is not the
+	 * boundary that stops an attack - it is the guard for a value stored before that
+	 * gate existed, or written by some other route.
+	 *
+	 * @param string $css The stored CSS.
+	 * @return string
+	 */
+	function blc_sanitize_custom_css( $css ) {
+		$css = (string) $css;
+
+		// A style element ends at the first "</style", however it is spelled.
+		$css = preg_replace( '#<\s*/\s*style#i', '', $css );
+
+		// Legitimate CSS carries no tags, so anything tag-shaped goes.
+		return trim( wp_strip_all_tags( $css ) );
+	}
+}
+
 	require BLC_DIRECTORY_LEGACY . '/config.php';
 
 	/***********************************************
@@ -77,8 +99,17 @@ if ( defined( 'BLC_ACTIVE' ) ) {
 	include BLC_DIRECTORY_LEGACY . '/includes/logger.php';
 
 	global $blclog;
-	if ( $blc_config_manager->get( 'logging_enabled', false ) && is_writable( $blc_config_manager->get( 'log_file' ) ) ) {
-		$blclog = new blcFileLogger( $blc_config_manager->get( 'log_file' ) );
+
+	/*
+	 * A path stored by an earlier version may still point outside the plugin's log
+	 * directory, so it is reduced here as well and not only when the setting is saved.
+	 */
+	$blc_log_file = $blc_config_manager->get( 'logging_enabled', false )
+		? blc_sanitize_log_path( $blc_config_manager->get( 'log_file' ) )
+		: '';
+
+	if ( '' !== $blc_log_file && blc_log_path_is_safe( $blc_log_file ) && is_writable( $blc_log_file ) ) {
+		$blclog = new blcFileLogger( $blc_log_file );
 	} else {
 		$blclog = new blcDummyLogger();
 	}
@@ -271,7 +302,7 @@ if ( defined( 'BLC_ACTIVE' ) ) {
 				if ( $blc_config_manager->options['mark_removed_links'] && ! empty( $blc_config_manager->options['removed_link_css'] ) ) {
 					function blc_print_removed_link_css() {
 						$blc_config_manager = blc_get_configuration();
-						echo '<style>',$blc_config_manager->options['removed_link_css'],'</style>';
+						echo '<style>', blc_sanitize_custom_css( $blc_config_manager->options['removed_link_css'] ), '</style>';
 					}
 					add_action( 'wp_head', 'blc_print_removed_link_css' );
 				}

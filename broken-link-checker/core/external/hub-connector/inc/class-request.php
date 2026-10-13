@@ -225,9 +225,12 @@ class Request {
 
 		// Default request options.
 		$args = array(
+			// No 'sslverify' override here on purpose: our API is always valid HTTPS, so we keep
+			// core's default (verify on) and no longer offer a plugin level opt-out
+			// (WPMUDEV_API_SSLVERIFY, deprecated). A broken local CA bundle can still be
+			// worked around with core's own https_ssl_verify / http_request_args filters.
 			'user-agent' => 'WPMUDEV Hub Connector Client/' . \WPMUDEV_HUB_CONNECTOR_VERSION . ' (+' . network_site_url() . ')',
 			'headers'    => $this->headers,
-			'sslverify'  => defined( '\WPMUDEV_API_SSLVERIFY' ) ? \WPMUDEV_API_SSLVERIFY : false,
 			'method'     => strtoupper( $method ),
 			'timeout'    => $this->timeout,
 		);
@@ -238,17 +241,24 @@ class Request {
 					$data = array_merge( $data, $this->post_args );
 				}
 
-				$args['body'] = $data;
+				$args['body'] = wp_json_encode( $data );
+				if ( ! isset( $args['headers']['Content-Type'] ) ) {
+					$args['headers']['Content-Type'] = 'application/json';
+				}
 
 				$response = wp_remote_post( $url, $args );
 				break;
 			case 'delete':
+				$args['method'] = 'DELETE';
+
 				if ( is_array( $data ) ) {
 					$data = array_merge( $data, $this->post_args );
 				}
 
-				$args['body']   = $data;
-				$args['method'] = 'DELETE';
+				$args['body'] = wp_json_encode( $data );
+				if ( ! isset( $args['headers']['Content-Type'] ) ) {
+					$args['headers']['Content-Type'] = 'application/json';
+				}
 
 				$response = wp_remote_request( $url, $args );
 				break;

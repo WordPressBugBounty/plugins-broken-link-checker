@@ -49,14 +49,23 @@ class Unlink_DOM_Processor extends Abstract_Content_Processor {
 				foreach ( $dom->getElementsByTagName( $tag_name ) as $dom_link ) {
 					$search_markup   = '';
 					$replacement_str = '';
+					$link_text       = '';
 					$old_link        = $dom_link->getAttribute( $tag_att );
 
 					$link     = untrailingslashit( trim( $link, '\'"' ) );
 					$old_link = untrailingslashit( trim( $old_link, '\'"' ) );
 
 					if ( $this->link_processor->links_match( $link, $old_link ) ) {
-						$search_markup   = $dom->saveHTML( $dom_link );
-						$replacement_str = $dom_link->nodeValue; //phpcs:ignore -- Using camelCase to match the DOMDocument property name.
+						$search_markup = $dom->saveHTML( $dom_link );
+
+						/*
+						 * nodeValue hands back the anchor text with entities already decoded, so text
+						 * that merely looked like markup in the source ("&lt;img ...&gt;") would be
+						 * written back into post_content as live markup. Serialise it through a text
+						 * node so it returns escaped.
+						 */
+						$link_text       = $dom_link->nodeValue; //phpcs:ignore -- Using camelCase to match the DOMDocument property name.
+						$replacement_str = $dom->saveHTML( $dom->createTextNode( $link_text ) );
 
 						// If already processed this exact markup, skip to avoid redundant callbacks and replacements.
 						if ( ! empty( $replacements[ $search_markup ] ) ) {
@@ -87,7 +96,8 @@ class Unlink_DOM_Processor extends Abstract_Content_Processor {
 						// This allows styling of unlinked items and preserves the original URL in a data attribute.
 						if ( apply_filters( 'wpmudev_blc_link_action_unlink_wrap', false, $link, $new_link ) ) {
 
-							$replacement_el = $dom->createElement( 'span', $replacement_str );
+							$replacement_el = $dom->createElement( 'span' );
+							$replacement_el->appendChild( $dom->createTextNode( $link_text ) );
 							$replacement_el->setAttribute( 'class', apply_filters( 'wpmudev_blc_link_action_unlink_wrap_class', 'blc_unlinked', $link, $new_link ) );
 							$replacement_el->setAttribute( 'data-blc-orig-url', $link );
 							$replacement_str = $dom->saveHTML( $replacement_el );

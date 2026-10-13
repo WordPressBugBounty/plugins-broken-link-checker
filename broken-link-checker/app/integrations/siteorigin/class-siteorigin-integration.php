@@ -121,54 +121,112 @@ class SiteOrigin_Integration extends Base {
 		}
 
 		if ( is_string( $content ) ) {
-			$panels = maybe_unserialize( $content );
+			if ( ! is_serialized( $content ) ) {
+				// Not serialized data, so it cannot be a SiteOrigin layout. Leave it untouched.
+				return $content;
+			}
+
+			// Never build objects from editor-controlled metadata. A SiteOrigin layout only
+			// ever holds arrays, strings and scalar values, so object creation is switched
+			// off entirely. Any object left in the decoded value is handled below.
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize -- Decoding here is deliberate and bounded: a malformed value must not break the link action, and `allowed_classes` is false so no object is ever created.
+			$panels = @unserialize( trim( $content ), array( 'allowed_classes' => false ) );
 		} else {
 			$panels = $content;
 		}
 
+		// Reject anything that is not a plain array tree. A value that still holds an
+		// object (for example an incomplete class created above) was not written by
+		// SiteOrigin and must not be used.
+		if ( ! is_array( $panels ) || $this->contains_object( $panels ) ) {
+			return $content;
+		}
+
 		if (
-			is_array( $panels ) &&
 			isset( $panels['widgets'] ) &&
 			is_array( $panels['widgets'] )
 		) {
+			$changed = false;
 
 			// Recursively search through the panels data for widget instances and update links as needed.
 			foreach ( $panels['widgets'] as &$widget ) {
 				if ( isset( $widget['panels_info']['class'] ) ) {
-
 					if ( SiteOrigin_Link_Processor::BUTTON_CLASS === $widget['panels_info']['class'] ) {
 						// This is a Button widget, so we need to process its content for link updates.
 						if ( ! empty( $widget['url'] ) ) {
-							$widget['url'] = str_replace(
+							$url = str_replace(
 								$link->get_link(),
 								$link->get_new_link(),
 								$widget['url']
 							);
+
+							if ( $url !== $widget['url'] ) {
+								$widget['url'] = $url;
+								$changed       = true;
+							}
 						}
 					}
 
 					if ( SiteOrigin_Link_Processor::IMAGE_CLASS === $widget['panels_info']['class'] ) {
 						// This is a Media Image widget, so we need to process its content for link updates.
 						if ( ! empty( $widget['link_url'] ) ) {
-							$widget['link_url'] = str_replace(
+							$link_url = str_replace(
 								$link->get_link(),
 								$link->get_new_link(),
 								$widget['link_url']
 							);
+
+							if ( $link_url !== $widget['link_url'] ) {
+								$widget['link_url'] = $link_url;
+								$changed            = true;
+							}
 						}
 					}
 				}
 			}
+			unset( $widget );
 
-			if ( is_string( $content ) ) {
-				// If the original content was a string, we need to serialize the modified
-				// panels data back to a string before returning it.
-				return maybe_serialize( $panels );
-			} else {
-				return $panels;
+			if ( ! $changed ) {
+				// Nothing matched, so return the original value untouched.
+				return $content;
 			}
+
+			// Hand back the decoded array rather than a serialized string. The extensive
+			// meta path passes the raw stored value and writes this return value straight
+			// back with update_post_meta(), which serializes arrays itself. Returning a
+			// serialized string here is what stored panels_data double-serialized.
+			return $panels;
 		}
 
 		return $content;
+	}
+
+	/**
+	 * Recursively checks whether a decoded value contains any PHP object.
+	 *
+	 * SiteOrigin stores layouts as nested arrays of scalars, so an object anywhere
+	 * in the tree means the value did not come from the builder. Incomplete classes,
+	 * created when unserialize() runs with `allowed_classes => false`, are objects
+	 * too and are rejected here.
+	 *
+	 * @param mixed $value The decoded value to inspect.
+	 * @return bool True when an object is found at any depth.
+	 */
+	private function contains_object( $value ) {
+		if ( is_object( $value ) ) {
+			return true;
+		}
+
+		if ( ! is_array( $value ) ) {
+			return false;
+		}
+
+		foreach ( $value as $item ) {
+			if ( $this->contains_object( $item ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }

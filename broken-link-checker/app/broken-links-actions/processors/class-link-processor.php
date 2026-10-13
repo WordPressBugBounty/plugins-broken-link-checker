@@ -129,13 +129,46 @@ abstract class Link_Processor extends Base {
 	public function parse_block_atts( array $block_atts = array(), string $link = null, string $new_link = null ) {
 		if ( ! empty( $block_atts ) ) {
 			foreach ( $block_atts as $key => $value ) {
-				if ( filter_var( $value, FILTER_VALIDATE_URL ) ) {
-					$block_atts[ $key ] = $this->get_block_att_value_replacement( $value, $new_link );
+				/*
+				 * Only rewrite a setting that both looks like a URL and actually holds the broken
+				 * link being actioned. Without the link comparison every URL-like block setting
+				 * (embedded video, navigation link, etc.) would be replaced or emptied too,
+				 * silently breaking unrelated content.
+				 */
+				if (
+					! is_string( $value ) ||
+					! filter_var( $value, FILTER_VALIDATE_URL ) ||
+					! $this->block_att_holds_link( $value, $link )
+				) {
+					continue;
 				}
+
+				$block_atts[ $key ] = $this->get_block_att_value_replacement( $value, $new_link );
 			}
 		}
 
 		return $block_atts;
+	}
+
+	/**
+	 * Checks whether a URL-like block attribute value holds the broken link being actioned.
+	 *
+	 * The comparison mirrors the one used for links found in the visible content: surrounding
+	 * quotes and a trailing slash are ignored, and URLs are normalised through `links_match()`.
+	 *
+	 * @param string      $att_value The URL-like block attribute value.
+	 * @param string|null $link      The link being replaced/unlinked.
+	 * @return bool
+	 */
+	public function block_att_holds_link( string $att_value = '', ?string $link = null ) : bool {
+		if ( empty( $att_value ) || empty( $link ) ) {
+			return false;
+		}
+
+		return $this->links_match(
+			untrailingslashit( trim( $link, '\'"' ) ),
+			untrailingslashit( trim( $att_value, '\'"' ) )
+		);
 	}
 
 	/**

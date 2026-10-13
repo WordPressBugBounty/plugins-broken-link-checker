@@ -216,10 +216,13 @@ class Elementor_Link_Processor extends Abstract_Content_Processor {
 			return $data;
 		}
 
-		// Update the image widget link URL by replacing the old link URL with the new link URL.
+		/*
+		 * A stored Elementor setting, not markup: sanitize_url() normalises the value
+		 * without HTML-encoding it. Elementor escapes it again when it renders.
+		 */
 		$data['link']['url'] = str_replace(
 			$link,
-			$new_link,
+			sanitize_url( $new_link ),
 			$data['link']['url']
 		);
 
@@ -249,10 +252,10 @@ class Elementor_Link_Processor extends Abstract_Content_Processor {
 		}
 
 		if ( strpos( $destination['value'], $link ) !== false ) {
-			// Update the link element URL by replacing the old link URL with the new link URL.
+			// A stored setting as above, so the same normalisation applies.
 			$data['link']['value']['destination']['value'] = str_replace(
 				$link,
-				$new_link,
+				sanitize_url( $new_link ),
 				$destination['value']
 			);
 		}
@@ -334,9 +337,13 @@ class Elementor_Link_Processor extends Abstract_Content_Processor {
 			return $content;
 		}
 
+		/*
+		 * This lands in markup, where the URL sits inside an href. esc_url() encodes the
+		 * quote characters so the value cannot close the attribute holding it.
+		 */
 		$content = str_replace(
 			$link,
-			$new_link,
+			esc_url( $new_link ),
 			$content
 		);
 

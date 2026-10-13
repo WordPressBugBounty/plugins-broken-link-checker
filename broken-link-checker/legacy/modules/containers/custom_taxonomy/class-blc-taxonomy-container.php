@@ -294,6 +294,25 @@ class blcTaxonomyContainer extends blcContainer {
 	}
 
 	/**
+	 * Check if the current user can edit the wrapped post.
+	 *
+	 * @return bool
+	 */
+	public function current_user_can_edit() {
+		$post = $this->get_wrapped_object();
+		if ( ! $post ) {
+			return false;
+		}
+
+		$post_type_object = get_post_type_object( $post->post_type );
+		if ( ! $post_type_object ) {
+			return false;
+		}
+
+		return current_user_can( $post_type_object->cap->edit_post, $this->container_id );
+	}
+
+	/**
 	 * Check if the wrapped object can be moved to the trash.
 	 *
 	 * @return bool
